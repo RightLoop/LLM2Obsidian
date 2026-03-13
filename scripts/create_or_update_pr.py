@@ -32,7 +32,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def read_body(body_file: str) -> str:
-    return Path(body_file).read_text(encoding="utf-8")
+    return Path(body_file).read_text(encoding="utf-8-sig")
 
 
 def request_json(url: str, token: str, method: str, payload: dict[str, object]) -> dict[str, object]:
