@@ -1,0 +1,105 @@
+"""LLM orchestration and offline fallbacks."""
+
+from __future__ import annotations
+
+from obsidian_agent.domain.enums import ProposalType, SourceType
+from obsidian_agent.domain.policies import classify_risk
+from obsidian_agent.domain.schemas import CaptureInput, NormalizedCapture, RelatedNoteCandidate, ReviewProposal
+from obsidian_agent.integrations.openai_client import OpenAIResponsesClient
+
+
+class LLMService:
+    """Normalize inputs and generate proposals."""
+
+    def __init__(self, client: OpenAIResponsesClient | None = None) -> None:
+        self.client = client
+
+    async def normalize_capture(self, payload: CaptureInput) -> NormalizedCapture:
+        """Return a structured capture payload."""
+
+        if self.client:
+            raw = await self.client.create_json_response(
+                instructions=(
+                    "Return JSON with keys: title, summary, entities, topics, tags, "
+                    "decision, confidence, conflicts, key_points, raw_excerpt."
+                ),
+                input_text=payload.text,
+            )
+            return NormalizedCapture.model_validate(raw)
+
+        title = payload.title or payload.text.splitlines()[0][:80] or "Untitled"
+        text = payload.text.strip()
+        words = text.split()
+        summary = " ".join(words[:60]).strip()
+        key_points = []
+        for sentence in text.replace("\n", " ").split("."):
+            sentence = sentence.strip()
+            if sentence:
+                key_points.append(sentence)
+            if len(key_points) == 3:
+                break
+        tags = list(dict.fromkeys([token.strip(".,:;!?").lower() for token in words if len(token) > 5]))[:5]
+        return NormalizedCapture(
+            title=title,
+            summary=summary,
+            entities=[],
+            topics=tags[:3],
+            tags=tags,
+            decision=ProposalType.NEW_NOTE,
+            confidence=0.65 if payload.source_type != SourceType.URL else 0.72,
+            conflicts=[],
+            key_points=key_points,
+            raw_excerpt=text[:500],
+        )
+
+    async def classify_integration_action(
+        self, new_note: str, related_notes: list[RelatedNoteCandidate]
+    ) -> ProposalType:
+        """Classify the integration action."""
+
+        if not related_notes:
+            return ProposalType.NEW_NOTE
+        if related_notes[0].score > 0.92:
+            return ProposalType.MERGE_CANDIDATE
+        if related_notes[0].score > 0.65:
+            return ProposalType.APPEND_CANDIDATE
+        return ProposalType.REVIEW_ONLY
+
+    async def generate_link_suggestions(
+        self, new_note: str, related_notes: list[RelatedNoteCandidate]
+    ) -> list[RelatedNoteCandidate]:
+        """Return related notes as link suggestions."""
+
+        del new_note
+        return related_notes[:5]
+
+    async def generate_review_proposal(
+        self,
+        new_note_path: str,
+        target_note_path: str | None,
+        rationale: str,
+        suggested_patch: str,
+        proposal_type: ProposalType,
+    ) -> ReviewProposal:
+        """Build a review proposal."""
+
+        risk_level = classify_risk(proposal_type)
+        return ReviewProposal(
+            proposal_type=proposal_type,
+            risk_level=risk_level,
+            title=f"Review for {new_note_path}",
+            source_note_path=new_note_path,
+            target_note_path=target_note_path,
+            rationale=rationale,
+            suggested_patch=suggested_patch,
+            related_links=[],
+        )
+
+    async def generate_digest(self, note_set: list[str]) -> str:
+        """Generate a small digest body."""
+
+        snippets = [note[:200].replace("\n", " ") for note in note_set[:10]]
+        lines = ["## Highlights"]
+        for snippet in snippets:
+            lines.append(f"- {snippet}")
+        return "\n".join(lines)
