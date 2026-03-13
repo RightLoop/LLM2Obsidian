@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>LLM2Obsidian Control Panel</title>
+    <link rel="stylesheet" href="/ui/assets/styles.css">
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">LLM2Obsidian</p>
+          <h1>Control Panel</h1>
+          <p class="lede">
+            Configure providers, connect Obsidian, and run the core workflows without touching
+            curl.
+          </p>
+        </div>
+        <div class="status-card">
+          <span id="healthBadge" class="badge">checking</span>
+          <p id="envPath" class="env-path">Loading runtime...</p>
+          <button id="reloadRuntime" class="secondary-button">Reload Runtime</button>
+        </div>
+      </header>
+
+      <main class="dashboard-grid">
+        <section class="panel panel-wide">
+          <div class="panel-head">
+            <h2>Runtime Config</h2>
+            <button id="saveConfig" class="primary-button">Save Config</button>
+          </div>
+          <form id="configForm" class="config-grid">
+            <label><span>LLM Provider</span><input name="llm_provider" value="deepseek"></label>
+            <label><span>Obsidian Mode</span><input name="obsidian_mode" value="auto"></label>
+            <label><span>Vault Root</span><input name="vault_root"></label>
+            <label><span>SQLite Path</span><input name="sqlite_path"></label>
+            <label><span>Vector Store Path</span><input name="vector_store_path"></label>
+            <label><span>Obsidian API URL</span><input name="obsidian_api_url"></label>
+            <label><span>Obsidian API Key</span><input name="obsidian_api_key" type="password"></label>
+            <label><span>DeepSeek API Key</span><input name="deepseek_api_key" type="password"></label>
+            <label><span>DeepSeek Base URL</span><input name="deepseek_base_url"></label>
+            <label><span>DeepSeek Model</span><input name="deepseek_model"></label>
+            <label><span>OpenAI API Key</span><input name="openai_api_key" type="password"></label>
+            <label><span>OpenAI Base URL</span><input name="openai_base_url"></label>
+            <label><span>OpenAI Model</span><input name="openai_model"></label>
+            <label><span>Log Level</span><input name="log_level"></label>
+            <label><span>Review Folder</span><input name="review_folder"></label>
+            <label><span>Inbox Folder</span><input name="inbox_folder"></label>
+            <label><span>HTTP Timeout</span><input name="http_timeout_seconds" type="number" step="0.5"></label>
+            <label><span>Retry Attempts</span><input name="http_retry_attempts" type="number" step="1"></label>
+            <label><span>Retry Backoff</span><input name="http_retry_backoff_seconds" type="number" step="0.1"></label>
+            <label class="toggle"><span>Verify SSL</span><input name="obsidian_verify_ssl" type="checkbox"></label>
+            <label class="toggle"><span>Dry Run</span><input name="dry_run" type="checkbox"></label>
+          </form>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Quick Actions</h2>
+          </div>
+          <div class="stack">
+            <button id="seedDemo" class="primary-button">Seed Demo Vault</button>
+            <button id="reindex" class="primary-button">Reindex Vault</button>
+            <div class="inline-form">
+              <input id="weekKey" value="2026-W11" aria-label="Week key">
+              <button id="runDigest" class="secondary-button">Weekly Digest</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Capture Text</h2>
+          </div>
+          <div class="stack">
+            <input id="captureTitle" placeholder="Title">
+            <textarea id="captureText" rows="8" placeholder="Paste a note, article excerpt, or idea..."></textarea>
+            <button id="captureSubmit" class="primary-button">Capture to Inbox</button>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Search</h2>
+          </div>
+          <div class="stack">
+            <input id="searchQuery" placeholder="Search notes">
+            <button id="searchSubmit" class="secondary-button">Run Search</button>
+            <div id="searchResults" class="result-list"></div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Review Queue</h2>
+            <button id="refreshReviews" class="ghost-button">Refresh</button>
+          </div>
+          <div id="reviewResults" class="result-list"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Maintenance</h2>
+            <button id="refreshMaintenance" class="ghost-button">Refresh</button>
+          </div>
+          <div class="stack maintenance-buttons">
+            <button data-target="duplicates" class="ghost-button maintenance-trigger">Duplicates</button>
+            <button data-target="orphans" class="ghost-button maintenance-trigger">Orphans</button>
+            <button data-target="metadata-issues" class="ghost-button maintenance-trigger">Metadata Issues</button>
+          </div>
+          <div id="maintenanceResults" class="result-list"></div>
+        </section>
+
+        <section class="panel panel-wide console-panel">
+          <div class="panel-head">
+            <h2>Console</h2>
+            <button id="clearConsole" class="ghost-button">Clear</button>
+          </div>
+          <pre id="consoleOutput" class="console-output">Waiting for action...</pre>
+        </section>
+      </main>
+    </div>
+
+    <script src="/ui/assets/app.js" defer></script>
+  </body>
+  </html>
