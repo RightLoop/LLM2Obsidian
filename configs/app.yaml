@@ -1,0 +1,4 @@
+app:
+  name: codex-project
+  environment: development
+  entrypoint: src.main:main
