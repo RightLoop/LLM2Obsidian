@@ -10,13 +10,19 @@ import httpx
 class OpenAIResponsesClient:
     """Thin wrapper over the OpenAI Responses API."""
 
-    def __init__(self, api_key: str, base_url: str = "https://api.openai.com/v1") -> None:
+    def __init__(
+        self,
+        api_key: str,
+        base_url: str = "https://api.openai.com/v1",
+        model: str = "gpt-4.1-mini",
+    ) -> None:
         self.api_key = api_key
         self.base_url = base_url.rstrip("/")
+        self.model = model
 
     async def create_json_response(self, instructions: str, input_text: str) -> dict[str, object]:
         payload = {
-            "model": "gpt-4.1-mini",
+            "model": self.model,
             "input": [
                 {"role": "system", "content": [{"type": "input_text", "text": instructions}]},
                 {"role": "user", "content": [{"type": "input_text", "text": input_text}]},

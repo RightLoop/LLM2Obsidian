@@ -2,16 +2,29 @@
 
 from __future__ import annotations
 
+from typing import Protocol
+
 from obsidian_agent.domain.enums import ProposalType, SourceType
 from obsidian_agent.domain.policies import classify_risk
-from obsidian_agent.domain.schemas import CaptureInput, NormalizedCapture, RelatedNoteCandidate, ReviewProposal
-from obsidian_agent.integrations.openai_client import OpenAIResponsesClient
+from obsidian_agent.domain.schemas import (
+    CaptureInput,
+    NormalizedCapture,
+    RelatedNoteCandidate,
+    ReviewProposal,
+)
+
+
+class JsonLLMClient(Protocol):
+    """Minimal contract for provider clients used by LLMService."""
+
+    async def create_json_response(self, instructions: str, input_text: str) -> dict[str, object]:
+        """Return structured JSON output."""
 
 
 class LLMService:
     """Normalize inputs and generate proposals."""
 
-    def __init__(self, client: OpenAIResponsesClient | None = None) -> None:
+    def __init__(self, client: JsonLLMClient | None = None) -> None:
         self.client = client
 
     async def normalize_capture(self, payload: CaptureInput) -> NormalizedCapture:
@@ -21,11 +34,13 @@ class LLMService:
             raw = await self.client.create_json_response(
                 instructions=(
                     "Return JSON with keys: title, summary, entities, topics, tags, "
-                    "decision, confidence, conflicts, key_points, raw_excerpt."
+                    "decision, confidence, conflicts, key_points, raw_excerpt. "
+                    "The decision field must be exactly one of: "
+                    "new_note, append_candidate, merge_candidate, review_only."
                 ),
                 input_text=payload.text,
             )
-            return NormalizedCapture.model_validate(raw)
+            return NormalizedCapture.model_validate(self._sanitize_normalized_capture(raw, payload))
 
         title = payload.title or payload.text.splitlines()[0][:80] or "Untitled"
         text = payload.text.strip()
@@ -51,6 +66,61 @@ class LLMService:
             key_points=key_points,
             raw_excerpt=text[:500],
         )
+
+    def _sanitize_normalized_capture(
+        self, raw: dict[str, object], payload: CaptureInput
+    ) -> dict[str, object]:
+        """Coerce provider JSON into the local schema contract."""
+
+        sanitized = dict(raw)
+        text = payload.text.strip()
+        title = payload.title or text.splitlines()[0][:80] or "Untitled"
+        sanitized["title"] = str(sanitized.get("title") or title)
+        sanitized["summary"] = str(sanitized.get("summary") or " ".join(text.split()[:60]).strip())
+        sanitized["raw_excerpt"] = str(sanitized.get("raw_excerpt") or text[:500])
+        sanitized["confidence"] = self._coerce_confidence(sanitized.get("confidence"))
+        sanitized["decision"] = self._coerce_decision(sanitized.get("decision"))
+        for field_name in ("entities", "topics", "tags", "conflicts", "key_points"):
+            sanitized[field_name] = self._coerce_string_list(sanitized.get(field_name))
+        sanitized["related_candidates"] = self._coerce_related_candidates(
+            sanitized.get("related_candidates"),
+        )
+        return sanitized
+
+    @staticmethod
+    def _coerce_decision(value: object) -> str:
+        allowed = {item.value for item in ProposalType}
+        candidate = str(value or "").strip().lower()
+        return candidate if candidate in allowed else ProposalType.NEW_NOTE.value
+
+    @staticmethod
+    def _coerce_confidence(value: object) -> float:
+        try:
+            return max(0.0, min(1.0, float(value)))
+        except (TypeError, ValueError):
+            return 0.5
+
+    @staticmethod
+    def _coerce_string_list(value: object) -> list[str]:
+        if isinstance(value, list):
+            return [str(item).strip() for item in value if str(item).strip()]
+        if isinstance(value, str) and value.strip():
+            return [value.strip()]
+        return []
+
+    def _coerce_related_candidates(self, value: object) -> list[dict[str, object]]:
+        if not isinstance(value, list):
+            return []
+        items: list[dict[str, object]] = []
+        for raw_item in value:
+            if not isinstance(raw_item, dict):
+                continue
+            path = str(raw_item.get("path") or "").strip()
+            reason = str(raw_item.get("reason") or "").strip() or "Related context"
+            score = self._coerce_confidence(raw_item.get("score"))
+            if path:
+                items.append({"path": path, "reason": reason, "score": score})
+        return items
 
     async def classify_integration_action(
         self, new_note: str, related_notes: list[RelatedNoteCandidate]

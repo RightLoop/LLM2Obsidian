@@ -15,10 +15,17 @@ class Settings(BaseSettings):
     app_env: str = "development"
     log_level: str = "INFO"
     dry_run: bool = False
+    llm_provider: str = "auto"
     openai_api_key: str | None = None
     openai_base_url: str = "https://api.openai.com/v1"
+    openai_model: str = "gpt-4.1-mini"
+    deepseek_api_key: str | None = None
+    deepseek_base_url: str = "https://api.deepseek.com"
+    deepseek_model: str = "deepseek-chat"
+    obsidian_mode: str = "auto"
     obsidian_api_url: str | None = None
     obsidian_api_key: str | None = None
+    obsidian_verify_ssl: bool = False
     vault_root: Path = Field(default=Path("./data/demo_vault"))
     sqlite_path: Path = Field(default=Path("./data/processed/obsidian_agent.db"))
     vector_store_path: Path = Field(default=Path("./data/processed/vector_index.json"))
