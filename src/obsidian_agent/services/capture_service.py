@@ -37,9 +37,18 @@ class CaptureService:
             job_repo.set_state(job.id, JobState.RUNNING)
             try:
                 normalized = await self.llm_service.normalize_capture(payload)
-                path = await self._write_inbox(payload, normalized)
+                write_result = await self._write_inbox(payload, normalized)
                 job_repo.set_state(job.id, JobState.SUCCEEDED)
-                return {"job_id": job.id, "note_path": path, "normalized": normalized.model_dump(mode="json")}
+                response_payload = {
+                    "job_id": job.id,
+                    "normalized": normalized.model_dump(mode="json"),
+                }
+                if hasattr(write_result, "model_dump"):
+                    response_payload["note_path"] = write_result.target_path
+                    response_payload["action_preview"] = write_result.model_dump(mode="json")
+                else:
+                    response_payload["note_path"] = write_result
+                return response_payload
             except Exception as exc:
                 job_repo.set_state(job.id, JobState.FAILED, str(exc))
                 raise

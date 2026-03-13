@@ -25,3 +25,4 @@ def test_capture_text_creates_inbox_note(tmp_path: Path) -> None:
     assert "00 Inbox/" in note_path
     created = (settings.vault_root / note_path).read_text(encoding="utf-8")
     assert "# Test" in created
+    assert "kind: inbox" in created

@@ -22,6 +22,10 @@ copy .env.example .env
 - `LLM_PROVIDER=deepseek`
 - `OBSIDIAN_MODE=auto`
 
+说明：
+- `OBSIDIAN_MODE=filesystem` 时，系统直接使用 `VAULT_ROOT` 本地读写。
+- `OBSIDIAN_MODE=rest` 或 `auto` 且 REST 写入成功时，实际目标 Vault 由 Obsidian 当前打开的 Vault 决定，不以 `VAULT_ROOT` 为准。
+
 3. 启动开发服务：
 
 ```bash
