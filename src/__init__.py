@@ -1,1 +1,1 @@
-"""Project package."""
+"""Top-level source package."""
