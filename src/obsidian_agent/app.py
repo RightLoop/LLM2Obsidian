@@ -9,6 +9,7 @@ from fastapi import FastAPI, Request
 from sqlalchemy.orm import sessionmaker
 
 from obsidian_agent.config import Settings, get_settings
+from obsidian_agent.integrations.deepseek_client import DeepSeekChatClient
 from obsidian_agent.integrations.obsidian_rest_client import ObsidianRestClient
 from obsidian_agent.integrations.openai_client import OpenAIResponsesClient
 from obsidian_agent.logging import configure_logging, trace_middleware
@@ -54,17 +55,30 @@ def build_container(settings: Settings | None = None) -> AppContainer:
     configure_logging(settings.log_level)
     session_factory = create_session_factory(settings.sqlite_path)
     rest_client = (
-        ObsidianRestClient(settings.obsidian_api_url, settings.obsidian_api_key)
+        ObsidianRestClient(
+            settings.obsidian_api_url,
+            settings.obsidian_api_key,
+            verify_ssl=settings.obsidian_verify_ssl,
+        )
         if settings.obsidian_api_url
         else None
     )
     obsidian_service = ObsidianService(settings, rest_client)
-    openai_client = (
-        OpenAIResponsesClient(settings.openai_api_key, settings.openai_base_url)
-        if settings.openai_api_key
-        else None
-    )
-    llm_service = LLMService(openai_client)
+    llm_client = None
+    provider = settings.llm_provider.lower()
+    if provider in {"auto", "deepseek"} and settings.deepseek_api_key:
+        llm_client = DeepSeekChatClient(
+            settings.deepseek_api_key,
+            settings.deepseek_base_url,
+            settings.deepseek_model,
+        )
+    elif provider in {"auto", "openai"} and settings.openai_api_key:
+        llm_client = OpenAIResponsesClient(
+            settings.openai_api_key,
+            settings.openai_base_url,
+            settings.openai_model,
+        )
+    llm_service = LLMService(llm_client)
     embeddings_service = EmbeddingsService()
     vector_store = VectorStore(settings.vector_store_path)
     retrieval_service = RetrievalService(session_factory, obsidian_service, embeddings_service, vector_store)

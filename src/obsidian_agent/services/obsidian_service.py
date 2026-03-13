@@ -24,6 +24,25 @@ class ObsidianService:
     def _path(self, vault_path: str) -> Path:
         return self.settings.vault_root / vault_path
 
+    def _mode(self) -> str:
+        return self.settings.obsidian_mode.lower()
+
+    def _rest_enabled(self) -> bool:
+        return self.client is not None and self._mode() in {"auto", "rest"}
+
+    def _strict_rest(self) -> bool:
+        return self.client is not None and self._mode() == "rest"
+
+    async def _run_with_optional_rest(self, operation, fallback):
+        if not self._rest_enabled():
+            return await fallback()
+        try:
+            return await operation()
+        except Exception:
+            if self._strict_rest():
+                raise
+            return await fallback()
+
     async def search_notes(
         self, query: str, top_k: int = 5, filters: dict[str, str] | None = None
     ) -> list[str]:
@@ -38,7 +57,13 @@ class ObsidianService:
         return results
 
     async def read_note(self, path: str) -> str:
-        return self._path(path).read_text(encoding="utf-8")
+        async def rest_read() -> str:
+            return await self.client.read_text(path)  # type: ignore[union-attr]
+
+        async def file_read() -> str:
+            return self._path(path).read_text(encoding="utf-8")
+
+        return await self._run_with_optional_rest(rest_read, file_read)
 
     async def read_notes(self, paths: list[str]) -> dict[str, str]:
         return {path: await self.read_note(path) for path in paths}
@@ -58,8 +83,17 @@ class ObsidianService:
                 target_path=str(target.relative_to(self.settings.vault_root)).replace("\\", "/"),
                 details={"title": title},
             )
-        target.write_text(content, encoding="utf-8")
-        return str(target.relative_to(self.settings.vault_root)).replace("\\", "/")
+        relative = str(target.relative_to(self.settings.vault_root)).replace("\\", "/")
+
+        async def rest_write() -> str:
+            await self.client.put_text(relative, content)  # type: ignore[union-attr]
+            return relative
+
+        async def file_write() -> str:
+            target.write_text(content, encoding="utf-8")
+            return relative
+
+        return await self._run_with_optional_rest(rest_write, file_write)
 
     async def append_to_note(self, path: str, section: str, content: str) -> ActionPreview | str:
         existing = await self.read_note(path)
@@ -70,8 +104,15 @@ class ObsidianService:
             updated = existing.rstrip() + f"\n\n{marker}\n{content.strip()}\n"
         if self.settings.dry_run:
             return ActionPreview(dry_run=True, action="append_to_note", target_path=path)
-        self._path(path).write_text(updated, encoding="utf-8")
-        return path
+        async def rest_write() -> str:
+            await self.client.put_text(path, updated)  # type: ignore[union-attr]
+            return path
+
+        async def file_write() -> str:
+            self._path(path).write_text(updated, encoding="utf-8")
+            return path
+
+        return await self._run_with_optional_rest(rest_write, file_write)
 
     async def replace_section(self, path: str, section_heading: str, content: str) -> ActionPreview | str:
         existing = await self.read_note(path)
@@ -91,16 +132,30 @@ class ObsidianService:
             updated += suffix
         if self.settings.dry_run:
             return ActionPreview(dry_run=True, action="replace_section", target_path=path)
-        self._path(path).write_text(updated, encoding="utf-8")
-        return path
+        async def rest_write() -> str:
+            await self.client.put_text(path, updated)  # type: ignore[union-attr]
+            return path
+
+        async def file_write() -> str:
+            self._path(path).write_text(updated, encoding="utf-8")
+            return path
+
+        return await self._run_with_optional_rest(rest_write, file_write)
 
     async def update_frontmatter(self, path: str, patch: dict[str, object]) -> ActionPreview | str:
         existing = await self.read_note(path)
         updated = patch_frontmatter(existing, patch)
         if self.settings.dry_run:
             return ActionPreview(dry_run=True, action="update_frontmatter", target_path=path)
-        self._path(path).write_text(updated, encoding="utf-8")
-        return path
+        async def rest_write() -> str:
+            await self.client.put_text(path, updated)  # type: ignore[union-attr]
+            return path
+
+        async def file_write() -> str:
+            self._path(path).write_text(updated, encoding="utf-8")
+            return path
+
+        return await self._run_with_optional_rest(rest_write, file_write)
 
     async def move_note(self, path: str, target_folder: str) -> ActionPreview | str:
         source = self._path(path)
@@ -113,8 +168,19 @@ class ObsidianService:
                 action="move_note",
                 target_path=str(target.relative_to(self.settings.vault_root)).replace("\\", "/"),
             )
-        source.rename(target)
-        return str(target.relative_to(self.settings.vault_root)).replace("\\", "/")
+        relative = str(target.relative_to(self.settings.vault_root)).replace("\\", "/")
+
+        async def rest_move() -> str:
+            content = await self.client.read_text(path)  # type: ignore[union-attr]
+            await self.client.put_text(relative, content)  # type: ignore[union-attr]
+            await self.client.delete_note(path)  # type: ignore[union-attr]
+            return relative
+
+        async def file_move() -> str:
+            source.rename(target)
+            return relative
+
+        return await self._run_with_optional_rest(rest_move, file_move)
 
     async def list_notes(self) -> list[str]:
         return [

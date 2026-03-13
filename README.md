@@ -18,6 +18,10 @@ pip install -e .[dev]
 copy .env.example .env
 ```
 
+默认推荐：
+- `LLM_PROVIDER=deepseek`
+- `OBSIDIAN_MODE=auto`
+
 3. 启动开发服务：
 
 ```bash
