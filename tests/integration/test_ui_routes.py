@@ -10,7 +10,8 @@ def test_dashboard_serves_html() -> None:
     client = TestClient(create_app())
     response = client.get("/")
     assert response.status_code == 200
-    assert "LLM2Obsidian Control Panel" in response.text
+    assert "LLM2Obsidian 控制台" in response.text
+    assert "简体中文" in response.text
 
 
 def test_ui_config_roundtrip_updates_env_file(tmp_path: Path) -> None:
