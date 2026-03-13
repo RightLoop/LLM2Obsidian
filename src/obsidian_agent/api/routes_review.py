@@ -5,9 +5,21 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 
 from obsidian_agent.api.deps import get_api_container
+from obsidian_agent.domain.schemas import GenerateReviewRequest
 
 router = APIRouter(prefix="/review", tags=["review"])
 ContainerDep = Annotated[object, Depends(get_api_container)]
+
+
+@router.post("/generate")
+async def generate_review(
+    request: GenerateReviewRequest, container: ContainerDep
+) -> dict[str, object]:
+    related_notes = await container.retrieval_service.find_related_notes(
+        request.note_path,
+        top_k=request.top_k,
+    )
+    return await container.synthesis_workflow.run(request.note_path, related_notes)
 
 
 @router.get("/pending")

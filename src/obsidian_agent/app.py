@@ -22,11 +22,13 @@ from obsidian_agent.services.normalize_service import NormalizeService
 from obsidian_agent.services.obsidian_service import ObsidianService
 from obsidian_agent.services.retrieval_service import RetrievalService
 from obsidian_agent.services.review_service import ReviewService
+from obsidian_agent.services.synthesis_service import SynthesisService
 from obsidian_agent.storage.db import create_session_factory
 from obsidian_agent.storage.vector_store import VectorStore
 from obsidian_agent.workflows.capture_workflow import CaptureWorkflow
 from obsidian_agent.workflows.link_workflow import LinkWorkflow
 from obsidian_agent.workflows.maintenance_workflow import MaintenanceWorkflow
+from obsidian_agent.workflows.synthesis_workflow import SynthesisWorkflow
 
 
 @dataclass
@@ -40,6 +42,8 @@ class AppContainer:
     capture_workflow: CaptureWorkflow
     retrieval_service: RetrievalService
     review_service: ReviewService
+    synthesis_service: SynthesisService
+    synthesis_workflow: SynthesisWorkflow
     indexing_service: IndexingService
     maintenance_service: MaintenanceService
     maintenance_workflow: MaintenanceWorkflow
@@ -87,6 +91,8 @@ def build_container(settings: Settings | None = None) -> AppContainer:
         obsidian_service=obsidian_service,
         template_path=_template_path("review_note.md.tmpl"),
     )
+    synthesis_service = SynthesisService(llm_service)
+    synthesis_workflow = SynthesisWorkflow(synthesis_service, review_service)
     capture_service = CaptureService(
         session_factory=session_factory,
         obsidian_service=obsidian_service,
@@ -111,6 +117,8 @@ def build_container(settings: Settings | None = None) -> AppContainer:
         capture_workflow=capture_workflow,
         retrieval_service=retrieval_service,
         review_service=review_service,
+        synthesis_service=synthesis_service,
+        synthesis_workflow=synthesis_workflow,
         indexing_service=indexing_service,
         maintenance_service=maintenance_service,
         maintenance_workflow=maintenance_workflow,
