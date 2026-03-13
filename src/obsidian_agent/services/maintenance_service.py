@@ -9,6 +9,7 @@ from pathlib import Path
 from sqlalchemy.orm import sessionmaker
 
 from obsidian_agent.domain.schemas import MaintenanceFinding
+from obsidian_agent.domain.schemas import ActionPreview
 from obsidian_agent.services.llm_service import LLMService
 from obsidian_agent.services.obsidian_service import ObsidianService
 from obsidian_agent.storage.repositories import MaintenanceRepository, NoteRepository
@@ -78,7 +79,7 @@ class MaintenanceService:
                     findings.append(MaintenanceFinding(path=path, reason=f"Missing frontmatter: {key}", score=1.0))
         return findings
 
-    async def generate_weekly_digest(self, week_key: str) -> str:
+    async def generate_weekly_digest(self, week_key: str) -> str | ActionPreview:
         note_bodies = []
         with self.session_factory() as session:
             notes = NoteRepository(session).list_all()
@@ -95,6 +96,9 @@ class MaintenanceService:
             frontmatter={"kind": "digest", "status": "draft", "week_key": week_key},
             body=markdown,
         )
+        if hasattr(created, "model_dump"):
+            created.details["week_key"] = week_key
+            return created
         created_path = created.target_path if hasattr(created, "target_path") else created
         with self.session_factory() as session:
             MaintenanceRepository(session).create("weekly_digest", week_key, created_path)

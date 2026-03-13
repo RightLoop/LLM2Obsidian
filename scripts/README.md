@@ -1,3 +1,7 @@
 # Scripts
 
-在此目录放置自动化脚本、批处理任务和开发辅助工具。
+Automation and developer helpers live here.
+
+- `seed_demo_data.py`: populate `data/demo_vault` with realistic C-language sample notes
+- `reindex_all.py`: rebuild local metadata and vector indexes
+- `create_or_update_pr.py`: create or update GitHub PR bodies with explicit UTF-8 handling

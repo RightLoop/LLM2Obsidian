@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     app_env: str = "development"
     log_level: str = "INFO"
     dry_run: bool = False
+    http_timeout_seconds: float = 30.0
+    http_retry_attempts: int = 3
+    http_retry_backoff_seconds: float = 0.5
     llm_provider: str = "auto"
     openai_api_key: str | None = None
     openai_base_url: str = "https://api.openai.com/v1"

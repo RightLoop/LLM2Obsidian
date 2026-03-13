@@ -40,6 +40,8 @@ async def reject(review_id: int, container: ContainerDep) -> dict[str, str]:
 
 
 @router.post("/{review_id}/apply")
-async def apply(review_id: int, container: ContainerDep) -> dict[str, str]:
-    await container.review_service.apply_approved_review(review_id)
-    return {"status": "applied"}
+async def apply(review_id: int, container: ContainerDep) -> dict[str, object]:
+    result = await container.review_service.apply_approved_review(review_id)
+    if hasattr(result, "model_dump"):
+        return {"status": "dry_run", "action_preview": result.model_dump(mode="json")}
+    return {"status": "applied", "target_path": result}

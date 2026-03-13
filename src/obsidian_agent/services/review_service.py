@@ -8,7 +8,7 @@ from sqlalchemy.orm import sessionmaker
 
 from obsidian_agent.domain.enums import ProposalType, ReviewState
 from obsidian_agent.domain.policies import can_auto_apply
-from obsidian_agent.domain.schemas import ReviewProposal
+from obsidian_agent.domain.schemas import ActionPreview, ReviewProposal
 from obsidian_agent.services.obsidian_service import ObsidianService
 from obsidian_agent.storage.repositories import ReviewRepository
 from obsidian_agent.utils.markdown import render_template
@@ -86,7 +86,7 @@ class ReviewService:
         with self.session_factory() as session:
             ReviewRepository(session).set_state(review_id, ReviewState.REJECTED)
 
-    async def apply_approved_review(self, review_id: int) -> None:
+    async def apply_approved_review(self, review_id: int) -> ActionPreview | str:
         with self.session_factory() as session:
             repo = ReviewRepository(session)
             item = repo.get(review_id)
@@ -99,9 +99,18 @@ class ReviewService:
             if item.proposal_type == ProposalType.APPEND_CANDIDATE.value:
                 if not item.target_note_path:
                     raise ValueError("Approved append proposal is missing target note path")
-                await self.obsidian_service.append_to_note(
+                write_result = await self.obsidian_service.append_to_note(
                     item.target_note_path,
                     "Related Notes",
                     item.suggested_patch,
                 )
-            repo.set_state(review_id, ReviewState.APPLIED)
+                if hasattr(write_result, "model_dump"):
+                    return ActionPreview(
+                        dry_run=True,
+                        action="apply_review",
+                        target_path=item.target_note_path,
+                        details={"review_id": review_id, "proposal_type": item.proposal_type},
+                    )
+                repo.set_state(review_id, ReviewState.APPLIED)
+                return write_result
+            raise ValueError(f"Auto-apply is not implemented for proposal type: {item.proposal_type}")

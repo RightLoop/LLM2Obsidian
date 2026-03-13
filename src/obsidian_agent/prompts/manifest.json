@@ -1,0 +1,31 @@
+{
+  "version": "v1",
+  "updated_at": "2026-03-14",
+  "assets": [
+    {
+      "path": "system/capture.md",
+      "kind": "system",
+      "purpose": "Base capture system instructions for structured normalization."
+    },
+    {
+      "path": "output_schemas/capture.json",
+      "kind": "schema",
+      "purpose": "Structured output contract for capture normalization."
+    },
+    {
+      "path": "tasks/inbox_note.md.tmpl",
+      "kind": "template",
+      "purpose": "Render Inbox notes from normalized captures."
+    },
+    {
+      "path": "tasks/review_note.md.tmpl",
+      "kind": "template",
+      "purpose": "Render review proposals into Obsidian markdown."
+    },
+    {
+      "path": "tasks/weekly_digest.md.tmpl",
+      "kind": "template",
+      "purpose": "Render weekly digest notes."
+    }
+  ]
+}
