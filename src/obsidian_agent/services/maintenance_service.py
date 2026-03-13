@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import difflib
+import re
 from pathlib import Path
 
 from sqlalchemy.orm import sessionmaker
@@ -31,27 +33,39 @@ class MaintenanceService:
     async def find_orphan_notes(self) -> list[MaintenanceFinding]:
         findings: list[MaintenanceFinding] = []
         paths = await self.obsidian_service.list_notes()
+        contents = {path: await self.obsidian_service.read_note(path) for path in paths}
         for path in paths:
-            content = await self.obsidian_service.read_note(path)
-            if "[[" not in content:
-                findings.append(MaintenanceFinding(path=path, reason="No explicit links", score=0.7))
+            content = contents[path]
+            outgoing = self._extract_links(content)
+            incoming = any(path in self._extract_links(other) for other_path, other in contents.items() if other_path != path)
+            if not outgoing and not incoming:
+                findings.append(
+                    MaintenanceFinding(
+                        path=path,
+                        reason="No incoming or outgoing explicit links",
+                        score=0.85,
+                    )
+                )
         return findings
 
     async def find_duplicate_candidates(self) -> list[MaintenanceFinding]:
         findings: list[MaintenanceFinding] = []
         paths = await self.obsidian_service.list_notes()
         contents = {path: await self.obsidian_service.read_note(path) for path in paths}
-        seen_titles: dict[str, str] = {}
-        for path in paths:
-            title = path.rsplit("/", 1)[-1].replace(".md", "").lower()
-            if title in seen_titles:
-                findings.append(MaintenanceFinding(path=path, reason=f"Similar title to {seen_titles[title]}", score=0.8))
-            seen_titles[title] = path
         items = list(contents.items())
         for index, (path, content) in enumerate(items):
             for other_path, other_content in items[index + 1 :]:
-                if content[:200] and content[:200] == other_content[:200]:
-                    findings.append(MaintenanceFinding(path=path, reason=f"Content overlaps with {other_path}", score=0.85))
+                title_score = self._similarity(self._title(path), self._title(other_path))
+                content_score = self._similarity(content[:600], other_content[:600])
+                combined = (title_score * 0.45) + (content_score * 0.55)
+                if combined >= 0.75:
+                    findings.append(
+                        MaintenanceFinding(
+                            path=path,
+                            reason=f"Potential duplicate of {other_path}",
+                            score=round(combined, 3),
+                        )
+                    )
         return findings
 
     async def find_metadata_issues(self) -> list[MaintenanceFinding]:
@@ -85,3 +99,15 @@ class MaintenanceService:
         with self.session_factory() as session:
             MaintenanceRepository(session).create("weekly_digest", week_key, created_path)
         return created_path
+
+    @staticmethod
+    def _extract_links(content: str) -> set[str]:
+        return set(re.findall(r"\[\[([^\]]+)\]\]", content))
+
+    @staticmethod
+    def _title(path: str) -> str:
+        return path.rsplit("/", 1)[-1].replace(".md", "").lower()
+
+    @staticmethod
+    def _similarity(left: str, right: str) -> float:
+        return difflib.SequenceMatcher(None, left.lower(), right.lower()).ratio()
