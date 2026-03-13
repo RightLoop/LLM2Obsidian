@@ -1,5 +1,170 @@
 const consoleOutput = document.getElementById("consoleOutput");
 const configForm = document.getElementById("configForm");
+const languageSelect = document.getElementById("languageSelect");
+
+const translations = {
+  "zh-CN": {
+    documentTitle: "LLM2Obsidian 控制台",
+    heroTitle: "控制台",
+    heroLede: "配置模型与 Obsidian 连接，并在浏览器里直接运行核心工作流。",
+    languageLabel: "语言",
+    healthChecking: "检查中",
+    envLoading: "正在加载运行时信息...",
+    reloadRuntime: "重新加载运行时",
+    runtimeConfig: "运行配置",
+    saveConfig: "保存配置",
+    llmProvider: "LLM 提供方",
+    obsidianMode: "Obsidian 模式",
+    vaultRoot: "Vault 根目录",
+    sqlitePath: "SQLite 路径",
+    vectorStorePath: "向量存储路径",
+    obsidianApiUrl: "Obsidian API URL",
+    obsidianApiKey: "Obsidian API Key",
+    deepseekApiKey: "DeepSeek API Key",
+    deepseekBaseUrl: "DeepSeek Base URL",
+    deepseekModel: "DeepSeek 模型",
+    openaiApiKey: "OpenAI API Key",
+    openaiBaseUrl: "OpenAI Base URL",
+    openaiModel: "OpenAI 模型",
+    logLevel: "日志级别",
+    reviewFolder: "Review 目录",
+    inboxFolder: "Inbox 目录",
+    httpTimeout: "HTTP 超时",
+    retryAttempts: "重试次数",
+    retryBackoff: "重试退避",
+    verifySsl: "校验 SSL",
+    dryRun: "Dry Run 预演",
+    quickActions: "快捷操作",
+    seedDemo: "生成演示知识库",
+    reindex: "重建索引",
+    weeklyDigest: "生成周报",
+    captureText: "文本采集",
+    captureTitlePlaceholder: "标题",
+    captureTextPlaceholder: "粘贴一段笔记、文章摘录或想法...",
+    captureToInbox: "采集到 Inbox",
+    search: "搜索",
+    searchPlaceholder: "搜索笔记",
+    runSearch: "执行搜索",
+    reviewQueue: "Review 队列",
+    refresh: "刷新",
+    maintenance: "维护",
+    duplicates: "重复候选",
+    orphans: "孤儿笔记",
+    metadataIssues: "元数据问题",
+    console: "控制台",
+    clear: "清空",
+    consoleWaiting: "等待操作...",
+    noItemsTitle: "没有结果",
+    noItemsBody: "当前结果集为空。",
+    noTargetNote: "没有目标笔记",
+    reviewConnector: "·",
+    scoreLabel: "分数",
+    runtimeLoaded: "已加载运行时",
+    reviewQueueRefreshed: "已刷新 Review 队列",
+    configSaved: "已保存配置",
+    runtimeReloaded: "已重新加载运行时",
+    demoVaultSeeded: "已生成演示知识库",
+    vaultReindexed: "已重建索引",
+    weeklyDigestDone: "周报任务结果",
+    captureComplete: "采集完成",
+    searchComplete: "搜索完成",
+    startupError: "启动错误",
+    consoleCleared: "控制台已清空。",
+    maintenancePrefix: "维护结果",
+  },
+  en: {
+    documentTitle: "LLM2Obsidian Control Panel",
+    heroTitle: "Control Panel",
+    heroLede: "Configure providers, connect Obsidian, and run the core workflows in the browser.",
+    languageLabel: "Language",
+    healthChecking: "checking",
+    envLoading: "Loading runtime information...",
+    reloadRuntime: "Reload Runtime",
+    runtimeConfig: "Runtime Config",
+    saveConfig: "Save Config",
+    llmProvider: "LLM Provider",
+    obsidianMode: "Obsidian Mode",
+    vaultRoot: "Vault Root",
+    sqlitePath: "SQLite Path",
+    vectorStorePath: "Vector Store Path",
+    obsidianApiUrl: "Obsidian API URL",
+    obsidianApiKey: "Obsidian API Key",
+    deepseekApiKey: "DeepSeek API Key",
+    deepseekBaseUrl: "DeepSeek Base URL",
+    deepseekModel: "DeepSeek Model",
+    openaiApiKey: "OpenAI API Key",
+    openaiBaseUrl: "OpenAI Base URL",
+    openaiModel: "OpenAI Model",
+    logLevel: "Log Level",
+    reviewFolder: "Review Folder",
+    inboxFolder: "Inbox Folder",
+    httpTimeout: "HTTP Timeout",
+    retryAttempts: "Retry Attempts",
+    retryBackoff: "Retry Backoff",
+    verifySsl: "Verify SSL",
+    dryRun: "Dry Run",
+    quickActions: "Quick Actions",
+    seedDemo: "Seed Demo Vault",
+    reindex: "Reindex Vault",
+    weeklyDigest: "Weekly Digest",
+    captureText: "Capture Text",
+    captureTitlePlaceholder: "Title",
+    captureTextPlaceholder: "Paste a note, article excerpt, or idea...",
+    captureToInbox: "Capture to Inbox",
+    search: "Search",
+    searchPlaceholder: "Search notes",
+    runSearch: "Run Search",
+    reviewQueue: "Review Queue",
+    refresh: "Refresh",
+    maintenance: "Maintenance",
+    duplicates: "Duplicates",
+    orphans: "Orphans",
+    metadataIssues: "Metadata Issues",
+    console: "Console",
+    clear: "Clear",
+    consoleWaiting: "Waiting for action...",
+    noItemsTitle: "No items",
+    noItemsBody: "The result set is empty.",
+    noTargetNote: "No target note",
+    reviewConnector: "·",
+    scoreLabel: "score",
+    runtimeLoaded: "Runtime loaded",
+    reviewQueueRefreshed: "Review queue refreshed",
+    configSaved: "Config saved",
+    runtimeReloaded: "Runtime reloaded",
+    demoVaultSeeded: "Demo vault seeded",
+    vaultReindexed: "Vault reindexed",
+    weeklyDigestDone: "Weekly digest",
+    captureComplete: "Capture complete",
+    searchComplete: "Search complete",
+    startupError: "Startup error",
+    consoleCleared: "Console cleared.",
+    maintenancePrefix: "Maintenance",
+  },
+};
+
+function currentLanguage() {
+  const stored = window.localStorage.getItem("ui-language");
+  return stored && translations[stored] ? stored : "zh-CN";
+}
+
+function t(key) {
+  return translations[currentLanguage()][key] || key;
+}
+
+function applyLanguage(lang) {
+  window.localStorage.setItem("ui-language", lang);
+  document.documentElement.lang = lang;
+  document.title = translations[lang].documentTitle;
+  languageSelect.value = lang;
+  for (const node of document.querySelectorAll("[data-i18n]")) {
+    node.textContent = translations[lang][node.dataset.i18n] || node.textContent;
+  }
+  for (const node of document.querySelectorAll("[data-i18n-placeholder]")) {
+    node.placeholder =
+      translations[lang][node.dataset.i18nPlaceholder] || node.placeholder;
+  }
+}
 
 function logResult(label, payload) {
   const rendered = typeof payload === "string" ? payload : JSON.stringify(payload, null, 2);
@@ -61,7 +226,7 @@ function getFormValues() {
 function renderCards(target, items, formatter) {
   target.innerHTML = "";
   if (!items.length) {
-    target.innerHTML = '<div class="result-card"><strong>No items</strong><small>The result set is empty.</small></div>';
+    target.innerHTML = `<div class="result-card"><strong>${t("noItemsTitle")}</strong><small>${t("noItemsBody")}</small></div>`;
     return;
   }
   for (const item of items) {
@@ -77,17 +242,17 @@ async function loadRuntime() {
   document.getElementById("healthBadge").textContent = runtime.health;
   document.getElementById("envPath").textContent = runtime.env_path;
   setFormValues(runtime.settings);
-  logResult("Runtime loaded", runtime);
+  logResult(t("runtimeLoaded"), runtime);
 }
 
 async function loadReviews() {
   const payload = await api("/review/pending");
   renderCards(document.getElementById("reviewResults"), payload.items, (item) => `
-    <strong>#${item.id} · ${item.proposal_type}</strong>
+    <strong>#${item.id} ${t("reviewConnector")} ${item.proposal_type}</strong>
     <div>${item.source_note_path || ""}</div>
-    <small>${item.target_note_path || "No target note"} · ${item.risk_level}</small>
+    <small>${item.target_note_path || t("noTargetNote")} ${t("reviewConnector")} ${item.risk_level}</small>
   `);
-  logResult("Review queue refreshed", payload);
+  logResult(t("reviewQueueRefreshed"), payload);
 }
 
 async function runMaintenance(target) {
@@ -95,9 +260,9 @@ async function runMaintenance(target) {
   renderCards(document.getElementById("maintenanceResults"), payload.items, (item) => `
     <strong>${item.path}</strong>
     <div>${item.reason}</div>
-    <small>score: ${item.score}</small>
+    <small>${t("scoreLabel")}: ${item.score}</small>
   `);
-  logResult(`Maintenance ${target}`, payload);
+  logResult(`${t("maintenancePrefix")} ${target}`, payload);
 }
 
 document.getElementById("saveConfig").addEventListener("click", async () => {
@@ -105,24 +270,24 @@ document.getElementById("saveConfig").addEventListener("click", async () => {
     method: "PUT",
     body: JSON.stringify(getFormValues()),
   });
-  logResult("Config saved", payload);
+  logResult(t("configSaved"), payload);
   setFormValues(payload.settings);
 });
 
 document.getElementById("reloadRuntime").addEventListener("click", async () => {
   const payload = await api("/ui/api/reload", { method: "POST" });
-  logResult("Runtime reloaded", payload);
+  logResult(t("runtimeReloaded"), payload);
   setFormValues(payload.settings);
 });
 
 document.getElementById("seedDemo").addEventListener("click", async () => {
   const payload = await api("/ui/api/seed-demo", { method: "POST" });
-  logResult("Demo vault seeded", payload);
+  logResult(t("demoVaultSeeded"), payload);
 });
 
 document.getElementById("reindex").addEventListener("click", async () => {
   const payload = await api("/ui/api/reindex", { method: "POST" });
-  logResult("Vault reindexed", payload);
+  logResult(t("vaultReindexed"), payload);
 });
 
 document.getElementById("runDigest").addEventListener("click", async () => {
@@ -130,7 +295,7 @@ document.getElementById("runDigest").addEventListener("click", async () => {
     method: "POST",
     body: JSON.stringify({ week_key: document.getElementById("weekKey").value }),
   });
-  logResult("Weekly digest", payload);
+  logResult(t("weeklyDigestDone"), payload);
 });
 
 document.getElementById("captureSubmit").addEventListener("click", async () => {
@@ -142,7 +307,7 @@ document.getElementById("captureSubmit").addEventListener("click", async () => {
       source_ref: "ui",
     }),
   });
-  logResult("Capture complete", payload);
+  logResult(t("captureComplete"), payload);
 });
 
 document.getElementById("searchSubmit").addEventListener("click", async () => {
@@ -151,9 +316,9 @@ document.getElementById("searchSubmit").addEventListener("click", async () => {
   renderCards(document.getElementById("searchResults"), payload.results, (item) => `
     <strong>${item.path}</strong>
     <div>${item.reason}</div>
-    <small>score: ${item.score}</small>
+    <small>${t("scoreLabel")}: ${item.score}</small>
   `);
-  logResult("Search complete", payload);
+  logResult(t("searchComplete"), payload);
 });
 
 document.getElementById("refreshReviews").addEventListener("click", loadReviews);
@@ -168,9 +333,15 @@ for (const button of document.querySelectorAll(".maintenance-trigger")) {
 }
 
 document.getElementById("clearConsole").addEventListener("click", () => {
-  consoleOutput.textContent = "Console cleared.";
+  consoleOutput.textContent = t("consoleCleared");
 });
+
+languageSelect.addEventListener("change", () => {
+  applyLanguage(languageSelect.value);
+});
+
+applyLanguage(currentLanguage());
 
 loadRuntime()
   .then(loadReviews)
-  .catch((error) => logResult("Startup error", error.message));
+  .catch((error) => logResult(t("startupError"), error.message));

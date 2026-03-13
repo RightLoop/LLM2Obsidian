@@ -51,6 +51,26 @@ body {
   padding: 28px;
 }
 
+.hero-topline {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.language-switcher {
+  min-width: 148px;
+}
+
+.language-switcher select {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.82);
+  padding: 10px 14px;
+  color: var(--ink);
+  font: inherit;
+}
+
 .status-card {
   padding: 24px;
   display: flex;
@@ -253,5 +273,9 @@ button:hover {
   .config-grid,
   .maintenance-buttons {
     grid-template-columns: 1fr;
+  }
+
+  .hero-topline {
+    flex-direction: column;
   }
 }
