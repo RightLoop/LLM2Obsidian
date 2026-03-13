@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 from sqlalchemy.orm import sessionmaker
 
 from obsidian_agent.domain.schemas import RelatedNoteCandidate
@@ -27,18 +29,22 @@ class RetrievalService:
         self.vector_store = vector_store
 
     async def keyword_search(self, text: str, top_k: int = 5) -> list[RelatedNoteCandidate]:
+        query_tokens = self._tokenize(text)
         with self.session_factory() as session:
             repo = NoteRepository(session)
             scored: list[RelatedNoteCandidate] = []
             for note in repo.list_all():
-                haystack = f"{note.title} {note.source_ref or ''}".lower()
-                overlap = sum(1 for token in text.lower().split() if token in haystack)
+                note_text = await self.obsidian_service.read_note(note.vault_path)
+                haystack = f"{note.title} {note.source_ref or ''} {note_text}".lower()
+                overlap_tokens = [token for token in query_tokens if token in haystack]
+                overlap = len(set(overlap_tokens))
                 if overlap:
+                    matched = ", ".join(sorted(set(overlap_tokens))[:3])
                     scored.append(
                         RelatedNoteCandidate(
                             path=note.vault_path,
-                            reason="Keyword overlap",
-                            score=min(1.0, overlap / max(len(text.split()), 1) + 0.2),
+                            reason=f"Keyword overlap: {matched}",
+                            score=min(1.0, overlap / max(len(query_tokens), 1) + 0.25),
                         )
                     )
             return sorted(scored, key=lambda item: item.score, reverse=True)[:top_k]
@@ -60,12 +66,21 @@ class RetrievalService:
             score = ((kw.score if kw else 0.0) * 0.45) + ((sem.score if sem else 0.0) * 0.55)
             reason_parts = []
             if kw:
-                reason_parts.append("keyword")
+                reason_parts.append(kw.reason)
             if sem:
-                reason_parts.append("semantic")
-            merged[path] = RelatedNoteCandidate(path=path, reason="+".join(reason_parts), score=score)
+                reason_parts.append(f"Semantic similarity {sem.score:.2f}")
+            merged[path] = RelatedNoteCandidate(
+                path=path,
+                reason="; ".join(reason_parts),
+                score=score,
+            )
         return sorted(merged.values(), key=lambda item: item.score, reverse=True)[:top_k]
 
     async def find_related_notes(self, note_path: str, top_k: int = 5) -> list[RelatedNoteCandidate]:
         content = await self.obsidian_service.read_note(note_path)
-        return await self.hybrid_search(content, top_k=top_k)
+        related = await self.hybrid_search(content, top_k=top_k + 1)
+        return [item for item in related if item.path != note_path][:top_k]
+
+    @staticmethod
+    def _tokenize(text: str) -> list[str]:
+        return re.findall(r"[a-zA-Z0-9][a-zA-Z0-9_-]{2,}", text.lower())
