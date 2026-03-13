@@ -27,6 +27,11 @@ class VectorStore:
         payload[key] = vector
         self._save(payload)
 
+    def clear(self) -> None:
+        """Reset the vector store."""
+
+        self._save({})
+
     def search(self, vector: list[float], top_k: int = 5) -> list[tuple[str, float]]:
         payload = self._load()
         scored: list[tuple[str, float]] = []

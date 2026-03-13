@@ -33,6 +33,8 @@ class IndexingService:
         indexed: list[str] = []
         with self.session_factory() as session:
             repo = NoteRepository(session)
+            repo.delete_missing(set(paths))
+            self.vector_store.clear()
             for path in paths:
                 frontmatter, body = await self.obsidian_service.parse_note(path)
                 content_hash = hashlib.sha256(body.encode("utf-8")).hexdigest()

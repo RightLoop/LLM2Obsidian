@@ -58,6 +58,15 @@ class NoteRepository:
     def get_by_path(self, vault_path: str) -> NoteRecord | None:
         return self.session.scalar(select(NoteRecord).where(NoteRecord.vault_path == vault_path))
 
+    def delete_missing(self, active_paths: set[str]) -> None:
+        """Remove stale metadata rows that no longer exist in the vault."""
+
+        rows = list(self.session.scalars(select(NoteRecord)).all())
+        for row in rows:
+            if row.vault_path not in active_paths:
+                self.session.delete(row)
+        self.session.commit()
+
 
 class IngestionJobRepository:
     """Capture job state repository."""
