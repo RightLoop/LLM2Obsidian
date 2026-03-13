@@ -39,6 +39,14 @@ python scripts/seed_demo_data.py
 uvicorn obsidian_agent.app:create_app --factory --reload
 ```
 
+Or on Windows, start the local dashboard with one script:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/start_dashboard.ps1
+```
+
+Then open `http://127.0.0.1:8000/`.
+
 5. Run static checks.
 
 ```bash
@@ -70,5 +78,7 @@ python -m compileall src scripts
 - Vault writes go through `ObsidianService` only.
 - `DRY_RUN=true` returns action previews for write paths instead of mutating the vault.
 - Prompt assets live under `src/obsidian_agent/prompts/` and are tracked by `manifest.json`.
+- The built-in control panel is served from `/` and `/ui`.
+- The control panel can edit `.env`, reload runtime settings, seed demo data, reindex, capture text, search notes, inspect review items, and run maintenance jobs.
 
 See [docs/operations.md](/W:/codex/codex/docs/operations.md), [docs/api.md](/W:/codex/codex/docs/api.md), and [docs/prompts.md](/W:/codex/codex/docs/prompts.md) for details.

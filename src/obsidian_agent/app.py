@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from fastapi import FastAPI, Request
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import sessionmaker
 
 from obsidian_agent.config import Settings, get_settings
@@ -52,6 +53,10 @@ class AppContainer:
 
 def _template_path(name: str) -> Path:
     return Path(__file__).resolve().parent / "prompts" / "tasks" / name
+
+
+def _ui_path(name: str) -> Path:
+    return Path(__file__).resolve().parent / "ui" / name
 
 
 def build_container(settings: Settings | None = None) -> AppContainer:
@@ -148,10 +153,13 @@ def create_app() -> FastAPI:
     from obsidian_agent.api.routes_maintenance import router as maintenance_router
     from obsidian_agent.api.routes_review import router as review_router
     from obsidian_agent.api.routes_search import router as search_router
+    from obsidian_agent.api.routes_ui import router as ui_router
 
     app = FastAPI(title="LLM2Obsidian")
     app.middleware("http")(trace_middleware)
     app.state.container = build_container()
+    app.mount("/ui/assets", StaticFiles(directory=_ui_path("")), name="ui-assets")
+    app.include_router(ui_router)
     app.include_router(capture_router)
     app.include_router(search_router)
     app.include_router(review_router)

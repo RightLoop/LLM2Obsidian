@@ -23,6 +23,14 @@ Set at least:
 uvicorn obsidian_agent.app:create_app --factory --reload
 ```
 
+Or on Windows:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/start_dashboard.ps1
+```
+
+Then open `http://127.0.0.1:8000/` to use the built-in control panel.
+
 ## 3. Build Local Indexes
 
 ```bash
