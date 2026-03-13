@@ -1,10 +1,10 @@
 # LLM2Obsidian
 
-本项目实现一个本地优先的 LLM + Obsidian 知识整合 Agent。Obsidian Vault 是知识真相源，所有中高风险修改都进入 `90 Review/`，不直接覆盖主笔记。
+Local-first knowledge ingestion and review workflows for Obsidian.
 
-## 快速开始
+## Quick Start
 
-1. 创建虚拟环境并安装依赖：
+1. Create a virtual environment and install dependencies.
 
 ```bash
 python -m venv .venv
@@ -12,39 +12,63 @@ python -m venv .venv
 pip install -e .[dev]
 ```
 
-2. 复制环境变量：
+2. Copy the environment file.
 
 ```bash
 copy .env.example .env
 ```
 
-默认推荐：
+Recommended defaults:
 - `LLM_PROVIDER=deepseek`
 - `OBSIDIAN_MODE=auto`
 
-说明：
-- `OBSIDIAN_MODE=filesystem` 时，系统直接使用 `VAULT_ROOT` 本地读写。
-- `OBSIDIAN_MODE=rest` 或 `auto` 且 REST 写入成功时，实际目标 Vault 由 Obsidian 当前打开的 Vault 决定，不以 `VAULT_ROOT` 为准。
+Mode notes:
+- `OBSIDIAN_MODE=filesystem` reads and writes directly under `VAULT_ROOT`.
+- `OBSIDIAN_MODE=rest` writes to the vault currently opened by Obsidian Local REST API.
+- `OBSIDIAN_MODE=auto` prefers REST and falls back to filesystem.
 
-3. 启动开发服务：
+3. Seed the demo vault if you want local sample data.
+
+```bash
+python scripts/seed_demo_data.py
+```
+
+4. Start the API.
 
 ```bash
 uvicorn obsidian_agent.app:create_app --factory --reload
 ```
 
-4. 运行测试：
+5. Run static checks.
 
 ```bash
-pytest
+ruff check src tests scripts
+python -m compileall src scripts
 ```
 
-## MVP 能力
+## Main Endpoints
 
 - `POST /capture/text`
 - `POST /capture/url`
+- `POST /capture/clipboard`
+- `POST /capture/pdf-text`
 - `GET /search`
 - `GET /notes/related`
-- Review 审批与应用
-- Maintenance reindex / orphan / duplicate / metadata issues / weekly digest
+- `POST /review/generate`
+- `GET /review/pending`
+- `POST /review/{id}/approve`
+- `POST /review/{id}/reject`
+- `POST /review/{id}/apply`
+- `POST /maintenance/reindex`
+- `GET /maintenance/orphans`
+- `GET /maintenance/duplicates`
+- `GET /maintenance/metadata-issues`
+- `POST /maintenance/weekly-digest`
 
-更多约束见 [docs/plan.md](docs/plan.md) 与 [docs/specs/git-flow.md](docs/specs/git-flow.md)。
+## Delivery Notes
+
+- Vault writes go through `ObsidianService` only.
+- `DRY_RUN=true` returns action previews for write paths instead of mutating the vault.
+- Prompt assets live under `src/obsidian_agent/prompts/` and are tracked by `manifest.json`.
+
+See [docs/operations.md](/W:/codex/codex/docs/operations.md), [docs/api.md](/W:/codex/codex/docs/api.md), and [docs/prompts.md](/W:/codex/codex/docs/prompts.md) for details.

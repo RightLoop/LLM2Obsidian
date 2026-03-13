@@ -63,6 +63,9 @@ def build_container(settings: Settings | None = None) -> AppContainer:
             settings.obsidian_api_url,
             settings.obsidian_api_key,
             verify_ssl=settings.obsidian_verify_ssl,
+            timeout_seconds=settings.http_timeout_seconds,
+            retry_attempts=settings.http_retry_attempts,
+            retry_backoff_seconds=settings.http_retry_backoff_seconds,
         )
         if settings.obsidian_api_url
         else None
@@ -75,12 +78,18 @@ def build_container(settings: Settings | None = None) -> AppContainer:
             settings.deepseek_api_key,
             settings.deepseek_base_url,
             settings.deepseek_model,
+            timeout_seconds=settings.http_timeout_seconds,
+            retry_attempts=settings.http_retry_attempts,
+            retry_backoff_seconds=settings.http_retry_backoff_seconds,
         )
     elif provider in {"auto", "openai"} and settings.openai_api_key:
         llm_client = OpenAIResponsesClient(
             settings.openai_api_key,
             settings.openai_base_url,
             settings.openai_model,
+            timeout_seconds=settings.http_timeout_seconds,
+            retry_attempts=settings.http_retry_attempts,
+            retry_backoff_seconds=settings.http_retry_backoff_seconds,
         )
     llm_service = LLMService(llm_client)
     embeddings_service = EmbeddingsService()

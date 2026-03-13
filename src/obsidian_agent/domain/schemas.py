@@ -151,4 +151,4 @@ class ActionPreview(BaseModel):
     dry_run: bool
     action: str
     target_path: str
-    details: dict[str, str] = Field(default_factory=dict)
+    details: dict[str, object] = Field(default_factory=dict)

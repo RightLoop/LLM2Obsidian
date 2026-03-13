@@ -6,6 +6,8 @@ import json
 
 import httpx
 
+from obsidian_agent.integrations.http_utils import request_with_retry
+
 
 class OpenAIResponsesClient:
     """Thin wrapper over the OpenAI Responses API."""
@@ -15,10 +17,16 @@ class OpenAIResponsesClient:
         api_key: str,
         base_url: str = "https://api.openai.com/v1",
         model: str = "gpt-4.1-mini",
+        timeout_seconds: float = 30.0,
+        retry_attempts: int = 3,
+        retry_backoff_seconds: float = 0.5,
     ) -> None:
         self.api_key = api_key
         self.base_url = base_url.rstrip("/")
         self.model = model
+        self.timeout_seconds = timeout_seconds
+        self.retry_attempts = retry_attempts
+        self.retry_backoff_seconds = retry_backoff_seconds
 
     async def create_json_response(self, instructions: str, input_text: str) -> dict[str, object]:
         payload = {
@@ -30,9 +38,12 @@ class OpenAIResponsesClient:
             "text": {"format": {"type": "json_object"}},
         }
         headers = {"Authorization": f"Bearer {self.api_key}"}
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(f"{self.base_url}/responses", headers=headers, json=payload)
-            response.raise_for_status()
+        async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
+            response = await request_with_retry(
+                lambda: client.post(f"{self.base_url}/responses", headers=headers, json=payload),
+                attempts=self.retry_attempts,
+                backoff_seconds=self.retry_backoff_seconds,
+            )
         data = response.json()
         output_text = data["output"][0]["content"][0]["text"]
         return json.loads(output_text)

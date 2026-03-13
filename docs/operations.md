@@ -1,9 +1,40 @@
 # Operations
 
-- 设置 `VAULT_ROOT` 指向本地 Vault。
-- 启动服务前确认 `data/processed/` 可写。
-- 生产中推荐开启 Obsidian Local REST API，并配置 `OBSIDIAN_API_URL`。
-- `OBSIDIAN_MODE=auto` 时优先尝试 REST，失败后回退到本地文件模式。
-- `OBSIDIAN_MODE=rest` 或 `auto` 成功走 REST 时，实际写入目标是 Obsidian 当前打开的 Vault；此时 `VAULT_ROOT` 仅用于文件模式和回退模式。
-- `LLM_PROVIDER=deepseek` 时会通过 DeepSeek 的 OpenAI-compatible 接口生成结构化输出。
-- `DRY_RUN=true` 时，系统只返回计划动作，不写 Vault。
+## Required Settings
+
+- `VAULT_ROOT`: local filesystem vault root for filesystem mode and local fallbacks
+- `OBSIDIAN_MODE`: `filesystem`, `rest`, or `auto`
+- `OBSIDIAN_API_URL`: required for `rest` or `auto`
+- `OBSIDIAN_API_KEY`: required for authenticated Obsidian Local REST API access
+- `LLM_PROVIDER`: `deepseek`, `openai`, or `auto`
+- `DEEPSEEK_API_KEY` or `OPENAI_API_KEY`: provider credential
+
+## Runtime Behavior
+
+- `OBSIDIAN_MODE=filesystem` writes directly under `VAULT_ROOT`.
+- `OBSIDIAN_MODE=rest` writes to the vault currently opened by Obsidian.
+- `OBSIDIAN_MODE=auto` prefers REST and falls back to filesystem if REST calls fail.
+- `DRY_RUN=true` returns planned write actions instead of mutating notes.
+- HTTP integrations use bounded retries and configurable timeout settings.
+
+## Recommended Local Workflow
+
+1. Copy `.env.example` to `.env`.
+2. Set `LLM_PROVIDER=deepseek`.
+3. Set `OBSIDIAN_MODE=auto`.
+4. Set `OBSIDIAN_API_URL`, `OBSIDIAN_API_KEY`, and `VAULT_ROOT`.
+5. Run `python scripts/seed_demo_data.py` if you want sample notes.
+6. Start the API with `uvicorn obsidian_agent.app:create_app --factory --reload`.
+7. Call `/maintenance/reindex` before search or related-note checks.
+
+## Dry-Run Semantics
+
+- Capture endpoints return `action_preview` when Inbox note creation is skipped.
+- `POST /review/{id}/apply` returns `status=dry_run` with a preview when note mutation is skipped.
+- `POST /maintenance/weekly-digest` returns `status=dry_run` with a preview when digest creation is skipped.
+
+## Verification
+
+- `ruff check src tests scripts --select F,E9,B`
+- `python -m compileall src scripts`
+- Run targeted smoke requests against your local vault or the demo vault.

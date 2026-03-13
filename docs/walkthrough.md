@@ -1,0 +1,55 @@
+# Local Walkthrough
+
+This walkthrough exercises the project against a local Obsidian setup or the demo vault.
+
+## 1. Prepare Environment
+
+```bash
+copy .env.example .env
+python scripts/seed_demo_data.py
+```
+
+Set at least:
+- `LLM_PROVIDER=deepseek`
+- `DEEPSEEK_API_KEY=...`
+- `OBSIDIAN_MODE=auto`
+- `OBSIDIAN_API_URL=...`
+- `OBSIDIAN_API_KEY=...`
+- `VAULT_ROOT=...`
+
+## 2. Start the API
+
+```bash
+uvicorn obsidian_agent.app:create_app --factory --reload
+```
+
+## 3. Build Local Indexes
+
+```bash
+curl -X POST http://127.0.0.1:8000/maintenance/reindex
+```
+
+## 4. Capture a Note
+
+```bash
+curl -X POST http://127.0.0.1:8000/capture/text ^
+  -H "Content-Type: application/json" ^
+  -d "{\"title\":\"C Pointer Ownership\",\"text\":\"Pointer ownership in C should be explicit and documented.\"}"
+```
+
+## 5. Generate and Apply a Review
+
+1. Call `POST /review/generate` with the new Inbox note path.
+2. Call `POST /review/{id}/approve`.
+3. Call `POST /review/{id}/apply`.
+
+## 6. Run Maintenance
+
+- `GET /maintenance/duplicates`
+- `GET /maintenance/orphans`
+- `GET /maintenance/metadata-issues`
+- `POST /maintenance/weekly-digest`
+
+## 7. Safe Trial Mode
+
+Set `DRY_RUN=true` before starting the API if you want previews without modifying the vault.

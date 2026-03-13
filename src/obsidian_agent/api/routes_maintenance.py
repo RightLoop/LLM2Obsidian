@@ -40,4 +40,6 @@ async def weekly_digest(
     request: WeeklyDigestRequest, container: ContainerDep
 ) -> dict[str, object]:
     path = await container.maintenance_workflow.weekly_digest(request.week_key)
+    if hasattr(path, "model_dump"):
+        return {"status": "dry_run", "action_preview": path.model_dump(mode="json")}
     return {"path": path}
