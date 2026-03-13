@@ -129,6 +129,9 @@ class ReviewRepository:
     def get(self, review_id: int) -> ReviewItem | None:
         return self.session.get(ReviewItem, review_id)
 
+    def list_all(self) -> list[ReviewItem]:
+        return list(self.session.scalars(select(ReviewItem).order_by(ReviewItem.id)).all())
+
     def set_state(self, review_id: int, state: ReviewState) -> ReviewItem:
         item = self.get(review_id)
         if item is None:

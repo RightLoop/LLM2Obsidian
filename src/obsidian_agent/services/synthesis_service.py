@@ -24,8 +24,8 @@ class SynthesisService:
         rationale = "Generated from related note analysis."
         if related_notes:
             rationale += f" Top candidate: {related_notes[0].path} ({related_notes[0].score:.2f})."
-        suggested_patch = "\n".join(f"- Link to [[{item.path}]]" for item in related_notes[:5]) or "- No links"
         proposal_type = await self.decide_action(new_note_path, related_notes)
+        suggested_patch = self._build_suggested_patch(new_note_path, related_notes, proposal_type)
         return await self.llm_service.generate_review_proposal(
             new_note_path=new_note_path,
             target_note_path=target_note_path,
@@ -33,3 +33,20 @@ class SynthesisService:
             suggested_patch=suggested_patch,
             proposal_type=proposal_type,
         )
+
+    @staticmethod
+    def _build_suggested_patch(
+        new_note_path: str,
+        related_notes: list[RelatedNoteCandidate],
+        proposal_type: ProposalType,
+    ) -> str:
+        if proposal_type == ProposalType.APPEND_CANDIDATE:
+            return f"- Link to [[{new_note_path}]]"
+        if proposal_type == ProposalType.MERGE_CANDIDATE:
+            return f"Merge candidate based on [[{new_note_path}]]"
+        if proposal_type == ProposalType.REVIEW_ONLY:
+            return "\n".join(
+                f"- Review relationship with [[{item.path}]] because {item.reason}"
+                for item in related_notes[:5]
+            ) or f"- Review [[{new_note_path}]]"
+        return f"- Created from [[{new_note_path}]]"

@@ -8,6 +8,7 @@
 - `GET /search`
 - `GET /notes/related`
 - `GET /review/pending`
+- `POST /review/generate`
 - `POST /review/{id}/approve`
 - `POST /review/{id}/reject`
 - `POST /review/{id}/apply`

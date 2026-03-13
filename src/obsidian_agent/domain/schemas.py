@@ -117,11 +117,19 @@ class ReviewProposal(BaseModel):
     related_links: list[str] = Field(default_factory=list)
 
 
+class GenerateReviewRequest(BaseModel):
+    note_path: str
+    top_k: int = 5
+
+
 class ReviewItemSchema(BaseModel):
     id: int | None = None
     source_note_id: int | None = None
     target_note_id: int | None = None
+    source_note_path: str | None = None
+    target_note_path: str | None = None
     proposal_type: ProposalType
+    suggested_patch: str | None = None
     proposal_path: str
     state: ReviewState
     risk_level: RiskLevel

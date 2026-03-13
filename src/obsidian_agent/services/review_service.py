@@ -41,9 +41,10 @@ class ReviewService:
         return render_template(self.template_path, context)
 
     async def create_review_item(self, proposal: ReviewProposal) -> tuple[int, str]:
+        source_title = proposal.source_note_path.rsplit("/", 1)[-1].replace(".md", "")
         created = await self.obsidian_service.create_note(
             folder=self.obsidian_service.settings.review_folder,
-            title=f"Review - {compact_timestamp()}",
+            title=source_title,
             frontmatter={
                 "id": compact_timestamp(),
                 "kind": "review",
@@ -60,12 +61,20 @@ class ReviewService:
             item = repo.create(proposal, created_path)
         return item.id, created_path
 
-    async def list_pending(self) -> list[dict[str, str | int]]:
+    async def list_pending(self) -> list[dict[str, str | int | None]]:
         with self.session_factory() as session:
             repo = ReviewRepository(session)
             items = repo.list_pending()
             return [
-                {"id": item.id, "proposal_path": item.proposal_path, "state": item.state, "risk_level": item.risk_level}
+                {
+                    "id": item.id,
+                    "proposal_path": item.proposal_path,
+                    "proposal_type": item.proposal_type,
+                    "source_note_path": item.source_note_path,
+                    "target_note_path": item.target_note_path,
+                    "state": item.state,
+                    "risk_level": item.risk_level,
+                }
                 for item in items
             ]
 
