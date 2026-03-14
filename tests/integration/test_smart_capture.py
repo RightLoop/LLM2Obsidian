@@ -47,3 +47,49 @@ def test_smart_error_capture_creates_error_node_and_db_records() -> None:
         occurrence = session.query(ErrorOccurrence).one()
         assert node.node_key == "error/sizeof-vs-strlen"
         assert occurrence.error_signature == "sizeof-vs-strlen"
+
+
+def test_smart_node_pack_builds_relations_between_related_errors() -> None:
+    root = make_test_dir("smart_node_pack")
+    settings = Settings(
+        _env_file=None,
+        obsidian_mode="filesystem",
+        vault_root=root / "vault",
+        sqlite_path=root / "db.sqlite3",
+        vector_store_path=root / "vectors.json",
+        smart_errors_folder="21 Errors",
+    )
+    client = TestClient(create_app(settings))
+
+    first = client.post(
+        "/smart/error-capture",
+        json={
+            "title": "sizeof 和 strlen 混淆",
+            "prompt": "我把 sizeof(arr) 当成字符串长度使用。",
+            "code": 'char arr[] = "abc"; printf("%zu", sizeof(arr));',
+            "user_analysis": "我以为 sizeof 会返回可见字符数量。",
+            "language": "c",
+        },
+    )
+    assert first.status_code == 200
+    second = client.post(
+        "/smart/error-capture",
+        json={
+            "title": "strlen 不统计终止符",
+            "prompt": "我没有意识到 strlen 不会包含结尾的空字符。",
+            "code": 'char arr[] = "abc"; printf("%zu", strlen(arr));',
+            "user_analysis": "我把 strlen 和内存大小混成一类了。",
+            "language": "c",
+        },
+    )
+    assert second.status_code == 200
+
+    pack = client.post(
+        "/smart/node-pack",
+        json={"node_key": first.json()["node"]["node_key"], "top_k": 5},
+    )
+    assert pack.status_code == 200
+    payload = pack.json()
+    assert payload["stored_edges"] >= 1
+    assert payload["pack"]["edges"][0]["relation_type"] == "commonly_confused_with"
+    assert "sizeof" in payload["pack"]["summary"].lower()

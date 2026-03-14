@@ -219,6 +219,15 @@ class KnowledgeNodeRepository:
     def list_all(self) -> list[KnowledgeNode]:
         return list(self.session.scalars(select(KnowledgeNode).order_by(KnowledgeNode.node_key)).all())
 
+    def list_others(self, node_key: str) -> list[KnowledgeNode]:
+        return list(
+            self.session.scalars(
+                select(KnowledgeNode)
+                .where(KnowledgeNode.node_key != node_key)
+                .order_by(KnowledgeNode.node_key)
+            ).all()
+        )
+
 
 class KnowledgeEdgeRepository:
     """Knowledge edge repository."""
@@ -238,6 +247,39 @@ class KnowledgeEdgeRepository:
         self.session.commit()
         self.session.refresh(entity)
         return entity
+
+    def replace_for_source(
+        self,
+        from_node_id: int | None,
+        edges: list[KnowledgeEdgeSchema],
+        node_ids_by_key: dict[str, int],
+    ) -> list[KnowledgeEdge]:
+        if from_node_id is None:
+            return []
+        existing = list(
+            self.session.scalars(select(KnowledgeEdge).where(KnowledgeEdge.from_node_id == from_node_id)).all()
+        )
+        for row in existing:
+            self.session.delete(row)
+        created: list[KnowledgeEdge] = []
+        for edge in edges:
+            target_id = node_ids_by_key.get(edge.to_node_key)
+            if target_id is None:
+                continue
+            created.append(
+                KnowledgeEdge(
+                    from_node_id=from_node_id,
+                    to_node_id=target_id,
+                    relation_type=edge.relation_type.value,
+                    reason=edge.reason,
+                    confidence=edge.confidence,
+                )
+            )
+        self.session.add_all(created)
+        self.session.commit()
+        for entity in created:
+            self.session.refresh(entity)
+        return created
 
 
 class ErrorOccurrenceRepository:

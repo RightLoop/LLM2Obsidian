@@ -221,3 +221,13 @@ class SmartErrorCaptureResponse(BaseModel):
     node: KnowledgeNodeSchema
     related_nodes: list[KnowledgeNodeSchema] = Field(default_factory=list)
     action_preview: ActionPreview | None = None
+
+
+class NodePackRequest(BaseModel):
+    node_key: str = Field(min_length=3)
+    top_k: int = Field(default=5, ge=1, le=10)
+
+
+class SmartNodePackResponse(BaseModel):
+    pack: RelationPack
+    stored_edges: int = 0

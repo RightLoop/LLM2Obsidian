@@ -28,8 +28,8 @@ class Settings(BaseSettings):
     deepseek_base_url: str = "https://api.deepseek.com"
     deepseek_model: str = "deepseek-chat"
     ollama_base_url: str = "http://127.0.0.1:11434"
-    ollama_chat_model: str = "qwen2.5:7b"
-    ollama_json_model: str = "qwen2.5:7b"
+    ollama_chat_model: str = "Qwen14B-fixed:latest"
+    ollama_json_model: str = "Qwen14B-fixed:latest"
     ollama_embedding_model: str = "nomic-embed-text"
     ollama_timeout_seconds: float = 60.0
     obsidian_mode: str = "auto"
