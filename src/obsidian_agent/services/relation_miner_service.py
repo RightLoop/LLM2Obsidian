@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import logging
-from pathlib import Path
 
 from obsidian_agent.domain.enums import KnowledgeRelationType
 from obsidian_agent.domain.schemas import KnowledgeEdgeSchema, KnowledgeNodeSchema
@@ -32,20 +31,25 @@ class RelationMinerService:
             instructions=(
                 "Return JSON with a top-level key 'relations' containing a list of objects with keys: "
                 "to_node_key, relation_type, reason, confidence. Allowed relation_type values are: "
-                "reveals_gap_in, requires, contrasts_with, commonly_confused_with, is_example_of, fixes, repeated_in. "
-                "Only return relations that are strongly supported."
+                "reveals_gap_in, requires, contrasts_with, commonly_confused_with, is_example_of, fixes, "
+                "repeated_in. Only return relations that are strongly supported. Use Simplified Chinese "
+                "for reason. Return at most 3 relations. Skip weak, generic, or self-evident links."
             ),
             input_text=self._compose_input(anchor, candidates),
         )
         self.last_telemetry = llm_service.pop_telemetry()
         if self.last_telemetry:
             logger.info("smart_telemetry task=relation_miner telemetry=%s", self.last_telemetry)
-        relations = self._sanitize(raw, anchor, candidates)
+        relations = self._sanitize(raw, candidates)
         if relations:
             return relations
         return self._fallback(anchor, candidates)
 
-    def _compose_input(self, anchor: KnowledgeNodeSchema, candidates: list[KnowledgeNodeSchema]) -> str:
+    def _compose_input(
+        self,
+        anchor: KnowledgeNodeSchema,
+        candidates: list[KnowledgeNodeSchema],
+    ) -> str:
         parts = [
             f"Anchor title: {anchor.title}",
             f"Anchor summary: {anchor.summary}",
@@ -69,14 +73,12 @@ class RelationMinerService:
     def _sanitize(
         self,
         raw: dict[str, object] | None,
-        anchor: KnowledgeNodeSchema,
         candidates: list[KnowledgeNodeSchema],
     ) -> list[KnowledgeEdgeSchema]:
-        del anchor
         if not raw or not isinstance(raw.get("relations"), list):
             return []
         candidate_keys = {item.node_key for item in candidates}
-        edges: list[KnowledgeEdgeSchema] = []
+        best_by_key: dict[str, KnowledgeEdgeSchema] = {}
         for item in raw["relations"]:
             if not isinstance(item, dict):
                 continue
@@ -90,16 +92,19 @@ class RelationMinerService:
                 confidence = max(0.0, min(1.0, float(item.get("confidence", 0.5))))
             except (TypeError, ValueError):
                 confidence = 0.5
-            edges.append(
-                KnowledgeEdgeSchema(
-                    from_node_key="",
-                    to_node_key=to_node_key,
-                    relation_type=KnowledgeRelationType(relation_type),
-                    reason=str(item.get("reason") or "Related concept"),
-                    confidence=confidence,
-                )
+            if confidence < 0.68:
+                continue
+            edge = KnowledgeEdgeSchema(
+                from_node_key="",
+                to_node_key=to_node_key,
+                relation_type=KnowledgeRelationType(relation_type),
+                reason=self._compress_reason(str(item.get("reason") or "相关概念。")),
+                confidence=confidence,
             )
-        return edges
+            current = best_by_key.get(to_node_key)
+            if current is None or edge.confidence > current.confidence:
+                best_by_key[to_node_key] = edge
+        return sorted(best_by_key.values(), key=lambda item: item.confidence, reverse=True)[:3]
 
     def _fallback(
         self,
@@ -113,16 +118,19 @@ class RelationMinerService:
             relation = self._guess_relation(anchor_text, candidate_text)
             if relation is None:
                 continue
+            reason = self._fallback_reason(anchor, candidate, relation)
+            if not reason:
+                continue
             edges.append(
                 KnowledgeEdgeSchema(
                     from_node_key=anchor.node_key,
                     to_node_key=candidate.node_key,
                     relation_type=relation,
-                    reason=f"Fallback relation inferred from overlapping C-language concepts in {Path(candidate.note_path or candidate.title).stem}.",
-                    confidence=0.62,
+                    reason=reason,
+                    confidence=0.72 if relation != KnowledgeRelationType.REPEATED_IN else 0.68,
                 )
             )
-        return edges
+        return sorted(edges, key=lambda item: item.confidence, reverse=True)[:3]
 
     def _normalized_text(self, node: KnowledgeNodeSchema) -> str:
         values = [node.title, node.summary]
@@ -142,6 +150,41 @@ class RelationMinerService:
             return KnowledgeRelationType.REQUIRES
         if "char-pointer" in anchor_text and "char-array" in candidate_text:
             return KnowledgeRelationType.CONTRASTS_WITH
-        if any(token in anchor_text and token in candidate_text for token in ("pointer", "array", "sizeof", "strlen")):
+        if any(
+            token in anchor_text and token in candidate_text
+            for token in ("pointer", "array", "sizeof", "strlen")
+        ):
             return KnowledgeRelationType.REPEATED_IN
         return None
+
+    def _fallback_reason(
+        self,
+        anchor: KnowledgeNodeSchema,
+        candidate: KnowledgeNodeSchema,
+        relation: KnowledgeRelationType,
+    ) -> str:
+        if relation == KnowledgeRelationType.COMMONLY_CONFUSED_WITH:
+            return f"“{anchor.title}”和“{candidate.title}”在这类 C 题里很容易被混淆。"
+        if relation == KnowledgeRelationType.REQUIRES:
+            return f"要解释“{anchor.title}”，必须先补上“{candidate.title}”这条前置规则。"
+        if relation == KnowledgeRelationType.CONTRASTS_WITH:
+            return f"这次判断要把“{anchor.title}”和“{candidate.title}”并排对比才不容易出错。"
+        if relation == KnowledgeRelationType.REPEATED_IN:
+            title_overlap = anchor.title == candidate.title
+            same_source = (
+                anchor.metadata.get("derived_from_error")
+                and anchor.metadata.get("derived_from_error")
+                == candidate.metadata.get("derived_from_error")
+            )
+            if title_overlap or same_source:
+                return ""
+            return f"“{candidate.title}”里重复出现了与当前错误相同的判断边界。"
+        return ""
+
+    def _compress_reason(self, reason: str) -> str:
+        compact = " ".join(reason.split()).strip()
+        if not compact:
+            return "相关概念。"
+        if len(compact) > 72:
+            compact = compact[:72].rstrip("，,。.;； ") + "。"
+        return compact

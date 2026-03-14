@@ -33,7 +33,7 @@ class SmartNodePackService:
             if anchor_entity is None:
                 raise ValueError(f"Knowledge node not found: {node_key}")
             anchor = self._to_schema(anchor_entity)
-            candidates = [self._to_schema(entity) for entity in node_repo.list_others(node_key)[:top_k]]
+            candidates = [self._to_schema(entity) for entity in node_repo.list_others(node_key)[: max(top_k * 2, 6)]]
 
         edges = await self.relation_miner.mine(anchor, candidates)
         normalized_edges = [
@@ -46,7 +46,9 @@ class SmartNodePackService:
             )
             for edge in edges
         ]
-        related_nodes = [item for item in candidates if item.node_key in {edge.to_node_key for edge in normalized_edges}]
+        related_nodes = [
+            item for item in candidates if item.node_key in {edge.to_node_key for edge in normalized_edges}
+        ][:top_k]
         pack = await self.context_compressor.build_pack(anchor, related_nodes, normalized_edges)
 
         with self.session_factory() as session:

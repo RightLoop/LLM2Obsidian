@@ -51,10 +51,11 @@ class ContextCompressorService:
         raw = await llm_service.run_structured_task(
             instructions=(
                 "Return JSON with keys: summary, relation_summary, weakness_labels, do_not_repeat, "
-                "recommended_output_shape, token_budget_hint, condensed_context. "
-                "Summarize the anchor node and its highest-value relations for a teaching workflow. "
+                "recommended_output_shape, token_budget_hint, condensed_context. Summarize the anchor "
+                "node and its highest-value relations for a teaching workflow. Use Simplified Chinese. "
                 "Keep condensed_context concise, include only the highest-value context, and set "
-                "recommended_output_shape to a short label like teaching_note or teaching_note_with_drills."
+                "recommended_output_shape to a short label like teaching_note or "
+                "teaching_note_with_drills. Do not mention more than 3 relations."
             ),
             input_text="\n".join(
                 [
@@ -97,10 +98,14 @@ class ContextCompressorService:
             data["recommended_output_shape"] = recommended_output_shape
         weakness_labels = raw.get("weakness_labels")
         if isinstance(weakness_labels, list):
-            data["weakness_labels"] = [str(item).strip() for item in weakness_labels if str(item).strip()]
+            data["weakness_labels"] = [
+                str(item).strip() for item in weakness_labels if str(item).strip()
+            ]
         do_not_repeat = raw.get("do_not_repeat")
         if isinstance(do_not_repeat, list):
-            data["do_not_repeat"] = [str(item).strip() for item in do_not_repeat if str(item).strip()]
+            data["do_not_repeat"] = [
+                str(item).strip() for item in do_not_repeat if str(item).strip()
+            ]
         try:
             token_budget_hint = int(raw.get("token_budget_hint", data["token_budget_hint"]))
         except (TypeError, ValueError):
@@ -114,14 +119,16 @@ class ContextCompressorService:
         related_nodes: list[KnowledgeNodeSchema],
         edges: list[KnowledgeEdgeSchema],
     ) -> dict[str, object]:
-        top_edges = ", ".join(f"{edge.relation_type.value} {edge.to_node_key}" for edge in edges[:3])
+        top_edges = ", ".join(
+            f"{edge.relation_type.value} {edge.to_node_key}" for edge in edges[:3]
+        )
         weakness_labels = self._extract_weakness_labels(anchor)
         do_not_repeat: list[str] = []
         incorrect_assumption = str(anchor.metadata.get("incorrect_assumption", "")).strip()
         if incorrect_assumption:
-            do_not_repeat.append(f"Do not repeat the incorrect assumption: {incorrect_assumption}")
+            do_not_repeat.append(f"不要重复错误假设：{incorrect_assumption}")
         if edges:
-            do_not_repeat.append("Do not restate every related note; only keep the highest-value contrasts and prerequisites.")
+            do_not_repeat.append("不要把所有相关节点都重讲一遍，只保留最关键的对比和前置关系。")
         condensed_parts = [
             f"Anchor: {anchor.title}",
             f"Summary: {anchor.summary}",
@@ -130,11 +137,13 @@ class ContextCompressorService:
             condensed_parts.append(f"Weaknesses: {', '.join(weakness_labels[:3])}")
         if related_nodes:
             condensed_parts.append(
-                "Related: " + "; ".join(f"{item.title} ({item.node_type.value})" for item in related_nodes[:4])
+                "Related: "
+                + "; ".join(f"{item.title} ({item.node_type.value})" for item in related_nodes[:4])
             )
         if edges:
             condensed_parts.append(
-                "Relations: " + "; ".join(
+                "Relations: "
+                + "; ".join(
                     f"{edge.relation_type.value} -> {edge.to_node_key}" for edge in edges[:4]
                 )
             )
@@ -142,11 +151,11 @@ class ContextCompressorService:
         token_budget_hint = max(450, min(1800, 280 + len(condensed_context) // 2))
         return {
             "summary": (
-                f"{anchor.title} links to {len(edges)} related nodes. Priority relations: {top_edges}."
+                f"围绕“{anchor.title}”当前保留了 {len(edges)} 条高价值关系，优先处理：{top_edges}。"
                 if edges
-                else f"No high-confidence related nodes were found yet for {anchor.title}."
+                else f"“{anchor.title}”暂时还没有足够强的高置信关系。"
             ),
-            "relation_summary": top_edges or "No priority relations yet.",
+            "relation_summary": top_edges or "暂时没有优先关系。",
             "weakness_labels": weakness_labels,
             "do_not_repeat": do_not_repeat,
             "recommended_output_shape": "teaching_note_with_drills" if edges else "teaching_note",

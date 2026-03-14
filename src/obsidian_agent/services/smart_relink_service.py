@@ -4,7 +4,12 @@ from __future__ import annotations
 
 from obsidian_agent.config import Settings
 from obsidian_agent.domain.enums import ProposalType, RiskLevel
-from obsidian_agent.domain.schemas import ActionPreview, ReviewProposal, SmartRelinkRequest, SmartRelinkResponse
+from obsidian_agent.domain.schemas import (
+    ActionPreview,
+    ReviewProposal,
+    SmartRelinkRequest,
+    SmartRelinkResponse,
+)
 from obsidian_agent.services.review_service import ReviewService
 from obsidian_agent.services.smart_node_pack_service import SmartNodePackService
 
@@ -30,7 +35,7 @@ class SmartRelinkService:
         pack = pack_response.pack
         if not pack.anchor.note_path:
             raise ValueError(f"Knowledge node is missing note_path: {request.node_key}")
-        related_section_markdown = self._render_related_section(pack_response.pack)
+        related_section_markdown = self._render_related_section(pack)
         preview = ActionPreview(
             dry_run=True,
             action="smart_relink_review",
@@ -56,9 +61,9 @@ class SmartRelinkService:
             title=f"Refresh related nodes for {pack.anchor.title}",
             source_note_path=pack.anchor.note_path,
             target_note_path=pack.anchor.note_path,
-            rationale=pack.summary or f"Refresh relation links for {pack.anchor.title}.",
+            rationale=self._build_rationale(pack),
             suggested_patch=related_section_markdown,
-            related_links=[node.note_path for node in pack.related_nodes if node.note_path],
+            related_links=[node.note_path for node in pack.related_nodes[:3] if node.note_path],
         )
         review_id, proposal_path = await self.review_service.create_review_item(proposal)
         return SmartRelinkResponse(
@@ -73,16 +78,35 @@ class SmartRelinkService:
     def _render_related_section(self, pack) -> str:
         lines: list[str] = []
         related_by_key = {node.node_key: node for node in pack.related_nodes}
-        for edge in pack.edges:
+        for edge in pack.edges[:3]:
             node = related_by_key.get(edge.to_node_key)
             target = edge.to_node_key
             if node and node.note_path:
                 target = f"[[{node.note_path}]]"
             elif node:
                 target = node.title
-            lines.append(
-                f"- {target}: {edge.relation_type.value} ({edge.confidence:.2f}) - {edge.reason}"
-            )
+            label = self._relation_label(edge.relation_type.value)
+            lines.append(f"- {target}：{label}，{edge.reason}")
         if not lines:
-            lines.append("- No strong related-node suggestions were found in this pass.")
+            lines.append("- 这一轮没有找到值得写入的高价值相关节点。")
         return "\n".join(lines)
+
+    def _build_rationale(self, pack) -> str:
+        if not pack.edges:
+            return f"“{pack.anchor.title}”这轮没有形成足够强的关系建议。"
+        edge_count = len(pack.edges[:3])
+        if any(edge.relation_type.value == "contrasts_with" for edge in pack.edges[:3]):
+            return f"建议为“{pack.anchor.title}”补充 {edge_count} 条高价值关联，其中包含关键对比关系。"
+        return f"建议为“{pack.anchor.title}”补充 {edge_count} 条高价值关联，便于后续复盘。"
+
+    def _relation_label(self, relation_type: str) -> str:
+        mapping = {
+            "reveals_gap_in": "暴露出理解缺口",
+            "requires": "依赖前置概念",
+            "contrasts_with": "需要并排对比",
+            "commonly_confused_with": "容易混淆",
+            "is_example_of": "可以作为例子",
+            "fixes": "用于纠正",
+            "repeated_in": "在相似错误中反复出现",
+        }
+        return mapping.get(relation_type, relation_type)

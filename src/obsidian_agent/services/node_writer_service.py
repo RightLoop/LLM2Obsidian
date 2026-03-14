@@ -57,7 +57,12 @@ class NodeWriterService:
         weaknesses: list[WeaknessObject],
     ) -> tuple[KnowledgeNodeSchema, list[KnowledgeNodeSchema], ActionPreview | None, int]:
         action_previews: list[ActionPreview] = []
-        error_node = await self._write_or_reuse_error_node(request, error, weaknesses, action_previews)
+        error_node = await self._write_or_reuse_error_node(
+            request,
+            error,
+            weaknesses,
+            action_previews,
+        )
         supporting_nodes = await self._write_or_reuse_supporting_nodes(
             error=error,
             weaknesses=weaknesses,
@@ -138,7 +143,10 @@ class NodeWriterService:
                     )
                     or "-",
                     "evidence": "\n".join(f"- {item}" for item in error.evidence) or "-",
-                    "related_concepts": "\n".join(f"- {item}" for item in error.related_concepts) or "-",
+                    "related_concepts": "\n".join(
+                        f"- {self._concept_label(item)}" for item in error.related_concepts
+                    )
+                    or "-",
                     "recommended_practice": "\n".join(
                         f"- {item.recommended_practice}" for item in weaknesses
                     )
@@ -220,10 +228,14 @@ class NodeWriterService:
                     {
                         "title": title,
                         "summary": summary,
-                        "node_type": spec.node_type.value,
-                        "practice_focus": str(merged_metadata.get("practice_focus", "-")),
+                        "node_type": self._node_type_label(spec.node_type),
+                        "durable_rule": str(merged_metadata.get("durable_rule", "-")),
+                        "key_distinction": str(merged_metadata.get("key_distinction", "-")),
+                        "when_to_use": str(merged_metadata.get("when_to_use", "-")),
+                        "avoid_confusion": str(merged_metadata.get("avoid_confusion", "-")),
                         "related_concepts": "\n".join(
-                            f"- {item}" for item in merged_metadata.get("related_concepts", [])
+                            f"- {self._concept_label(item)}"
+                            for item in merged_metadata.get("related_concepts", [])
                         )
                         or "-",
                         "evidence": "\n".join(
@@ -274,17 +286,21 @@ class NodeWriterService:
                 if node_key in concept_seen:
                     continue
                 concept_seen.add(node_key)
+                title = self._concept_title(concept)
                 nodes.append(
                     KnowledgeNodeSchema(
                         node_key=node_key,
                         node_type=KnowledgeNodeType.CONCEPT,
-                        title=concept.replace("-", " ").title(),
-                        summary=weakness.summary,
+                        title=title,
+                        summary=self._concept_summary(concept, error),
                         note_path=None,
                         source_note_path=source_note_path,
                         tags=["concept", error.language, *error.tags[:2]],
                         metadata={
-                            "practice_focus": weakness.recommended_practice,
+                            "durable_rule": self._concept_rule(concept, error),
+                            "key_distinction": self._concept_distinction(concept, error),
+                            "when_to_use": self._concept_usage(concept, error),
+                            "avoid_confusion": error.incorrect_assumption,
                             "related_concepts": weakness.related_concepts,
                             "derived_from_error": error.error_signature,
                             "evidence": error.evidence[:2],
@@ -296,13 +312,16 @@ class NodeWriterService:
             KnowledgeNodeSchema(
                 node_key=f"pitfall/{slugify(error.error_signature)}",
                 node_type=KnowledgeNodeType.PITFALL,
-                title=f"Pitfall: {error.title}",
-                summary=error.incorrect_assumption,
+                title=f"易错点：{error.title}",
+                summary=f"这类错误通常发生在：{error.trigger_mistake}",
                 note_path=None,
                 source_note_path=source_note_path,
                 tags=["pitfall", error.language, *error.tags[:2]],
                 metadata={
-                    "practice_focus": error.root_cause,
+                    "durable_rule": error.corrective_rule,
+                    "key_distinction": error.root_cause,
+                    "when_to_use": "做题时遇到相似表达式、内存布局或边界判断题时，先按规则逐项核对。",
+                    "avoid_confusion": error.incorrect_assumption,
                     "related_concepts": error.related_concepts,
                     "derived_from_error": error.error_signature,
                     "evidence": error.evidence,
@@ -317,12 +336,15 @@ class NodeWriterService:
                     node_key=f"contrast/{slugify(contrast_title)}",
                     node_type=KnowledgeNodeType.CONTRAST,
                     title=contrast_title,
-                    summary=f"Contrast the commonly confused ideas behind {error.title}.",
+                    summary=self._contrast_summary(error),
                     note_path=None,
                     source_note_path=source_note_path,
                     tags=["contrast", error.language, *error.tags[:2]],
                     metadata={
-                        "practice_focus": error.incorrect_assumption,
+                        "durable_rule": self._contrast_rule(error),
+                        "key_distinction": error.root_cause,
+                        "when_to_use": "当题目同时出现这两个相邻概念，或你准备直接套结论时，先停下来做对比。",
+                        "avoid_confusion": error.incorrect_assumption,
                         "related_concepts": error.related_concepts,
                         "derived_from_error": error.error_signature,
                         "evidence": error.evidence,
@@ -358,13 +380,14 @@ class NodeWriterService:
         edges: list[KnowledgeEdgeSchema] = []
         for node in nodes:
             relation_type = KnowledgeRelationType.COMMONLY_CONFUSED_WITH
-            reason = error.incorrect_assumption
+            reason = "这条链接指向本次错题里最容易混淆的相邻概念。"
             if node.node_type == KnowledgeNodeType.CONCEPT:
                 relation_type = KnowledgeRelationType.REVEALS_GAP_IN
-                reason = f"{error.title} reveals a gap in {node.title}."
+                reason = f"这次错题直接暴露出对“{node.title}”的理解缺口。"
             elif node.node_type == KnowledgeNodeType.CONTRAST:
                 relation_type = KnowledgeRelationType.CONTRASTS_WITH
-                reason = f"{error.title} benefits from contrasting the nearby concepts explicitly."
+                label = node.title.replace("对比：", "").replace("对比:", "").strip()
+                reason = f"这次题目需要把“{label}”明确区分开。"
             edges.append(
                 KnowledgeEdgeSchema(
                     from_node_key=error_node_key,
@@ -405,13 +428,118 @@ class NodeWriterService:
         signature = error.error_signature.lower()
         if "-vs-" in signature:
             left, right = signature.split("-vs-", maxsplit=1)
-            return f"Contrast: {left.replace('-', ' ')} vs {right.replace('-', ' ')}"
+            return f"对比：{self._concept_title(left)} vs {self._concept_title(right)}"
+        if signature not in {
+            "sizeof-vs-strlen",
+            "arr-vs-address-of-array",
+            "char-pointer-vs-char-array",
+        }:
+            return None
         concepts = error.related_concepts[:2]
         if len(concepts) >= 2:
-            return f"Contrast: {concepts[0].replace('-', ' ')} vs {concepts[1].replace('-', ' ')}"
+            return f"对比：{self._concept_title(concepts[0])} vs {self._concept_title(concepts[1])}"
         if "arr" in error.incorrect_assumption.lower() and "&arr" in " ".join(error.evidence).lower():
-            return "Contrast: arr vs &arr"
+            return "对比：arr vs &arr"
         return None
+
+    def _concept_title(self, concept: str) -> str:
+        mapping = {
+            "sizeof": "sizeof 的语义",
+            "strlen": "strlen 的语义",
+            "pointer": "指针语义",
+            "array": "数组对象",
+            "array-decay": "数组退化",
+            "char-pointer": "char* 指针",
+            "char-array": "char[] 数组",
+            "function-parameter": "函数形参与退化",
+            "address-of-array": "整个数组对象的地址",
+            "null-terminator": "字符串结尾空字符",
+            "memory-alignment": "内存对齐",
+            "struct-padding": "结构体填充",
+            "pointer-lifetime": "指针生命周期",
+        }
+        return mapping.get(concept, concept.replace("-", " "))
+
+    def _concept_label(self, concept: str) -> str:
+        return self._concept_title(concept)
+
+    def _concept_summary(self, concept: str, error: ErrorObject) -> str:
+        mapping = {
+            "sizeof": "sizeof 计算的是表达式或类型在当前语境下占用的字节数，不负责回答字符串逻辑长度。",
+            "strlen": "strlen 从起始地址向后扫描，直到遇到 \\0，返回的是字符串逻辑长度而不是占用总字节数。",
+            "pointer": "指针变量保存的是地址值，本身有自己的大小、类型和可解引用边界。",
+            "array": "数组对象是一段连续存储空间，元素个数属于对象本体信息，不等于普通指针变量。",
+            "array-decay": "数组在大多数表达式里会退化成首元素指针，但并不是所有语境都发生退化。",
+            "char-pointer": "char* 表示一个保存字符地址的指针变量，不代表它拥有对应字符存储。",
+            "char-array": "char[] 是真正存放字符的数组对象，容量和内容都属于对象本体。",
+            "function-parameter": "数组作为函数形参时会按指针语义处理，调用点的数组长度不会自动保留。",
+            "address-of-array": "&arr 指向整个数组对象，类型层级与 arr 退化后的首元素指针不同。",
+            "null-terminator": "合法的 C 字符串必须以 \\0 结尾；终止符既影响遍历，也影响容量判断。",
+            "memory-alignment": "内存对齐要求会改变对象在内存中的起始位置和整体大小。",
+            "struct-padding": "结构体为了满足成员和整体对齐，可能插入 padding 字节。",
+            "pointer-lifetime": "地址值存在不代表对象仍然有效，指针是否可用取决于被指对象的生命周期。",
+        }
+        return mapping.get(concept, f"这个概念是理解“{error.title}”时必须先分清的判断边界。")
+
+    def _concept_rule(self, concept: str, error: ErrorObject) -> str:
+        mapping = {
+            "sizeof": "先确认自己在求“占用字节数”还是“逻辑长度”；只有前者才优先考虑 sizeof。",
+            "strlen": "只有在确定内存里存在合法 C 字符串时，才能用 strlen 讨论其逻辑长度。",
+            "pointer": "先写出指针指向的对象类型，再判断它是否还能被安全解引用。",
+            "array": "看到数组时先把它当“对象”理解，而不是先把它当普通指针变量。",
+            "array-decay": "每次看到数组参与表达式，都先问一句：这里有没有发生退化？",
+            "char-pointer": "char* 默认只说明“保存了字符地址”，不说明那段字符一定可写。",
+            "char-array": "char[] 默认说明“对象自己拥有存储空间”，容量必须单独核对。",
+            "function-parameter": "数组进入函数后按指针处理，需要长度就显式传入，不靠 sizeof 猜。",
+            "address-of-array": "看到 &arr 时先写类型，再判断它是“整个数组对象地址”，不是首元素地址。",
+            "null-terminator": "只要题目涉及 C 字符串，就把 \\0 当成真实占位字节一起考虑。",
+            "memory-alignment": "估算内存大小前，先列出每个对象的对齐要求。",
+            "struct-padding": "算结构体大小时不要直接相加成员 sizeof，先按布局顺序推 padding。",
+            "pointer-lifetime": "保留地址之前先确认对象在后续使用点前不会结束生命周期。",
+        }
+        return mapping.get(concept, error.corrective_rule)
+
+    def _concept_distinction(self, concept: str, error: ErrorObject) -> str:
+        mapping = {
+            "sizeof": "要和 strlen、对象容量、元素个数这些概念区分开。",
+            "strlen": "要和 sizeof、缓冲区容量、已分配字节数区分开。",
+            "pointer": "要和数组对象、被指对象本体、尾后一位位置区分开。",
+            "array": "要和数组退化后的指针值、可变指针变量区分开。",
+            "array-decay": "要和“数组对象本体仍然存在”这件事区分开。",
+            "char-pointer": "要和 char[] 数组、字符串字面量可写性区分开。",
+            "char-array": "要和 char* 指针变量、字面量地址区分开。",
+            "function-parameter": "要和调用点处真实数组对象及其长度信息区分开。",
+            "address-of-array": "要和首元素地址、一级指针类型区分开。",
+            "null-terminator": "要和可见字符、缓冲区容量、拷贝字节数区分开。",
+            "memory-alignment": "要和成员表面大小直接相加的直觉区分开。",
+            "struct-padding": "要和“成员之间没有空洞”的假设区分开。",
+            "pointer-lifetime": "要和“地址值还在”这种表面现象区分开。",
+        }
+        return mapping.get(concept, error.root_cause)
+
+    def _concept_usage(self, concept: str, error: ErrorObject) -> str:
+        mapping = {
+            "sizeof": "判断对象大小、类型大小、静态数组总字节数时使用。",
+            "strlen": "确认合法 C 字符串逻辑长度时使用。",
+            "pointer": "推理间接访问、动态内存、函数参数和边界移动时使用。",
+            "array": "推理对象容量、元素布局和不会被重新赋值的数组本体时使用。",
+            "array-decay": "判断数组进表达式、函数参数和指针运算时是否按指针语义处理时使用。",
+            "char-pointer": "判断地址来源、可写性和是否拥有存储空间时使用。",
+            "char-array": "判断容量、终止符空间和原地修改时使用。",
+            "function-parameter": "分析函数内部的 sizeof、长度判断和形参语义时使用。",
+            "address-of-array": "分析多维数组、数组整体地址和指针类型时使用。",
+            "null-terminator": "分析字符串拷贝、拼接、遍历和容量分配时使用。",
+            "memory-alignment": "分析 ABI、结构体大小和性能布局时使用。",
+            "struct-padding": "分析结构体 sizeof、二进制布局和字段顺序影响时使用。",
+            "pointer-lifetime": "分析返回地址、free 之后访问和悬空引用时使用。",
+        }
+        return mapping.get(concept, f"在处理“{error.title}”这一类题目时使用。")
+
+    def _contrast_summary(self, error: ErrorObject) -> str:
+        return f"这组对比用于拆开“{error.title}”里最容易被混为一谈的两个概念。"
+
+    def _contrast_rule(self, error: ErrorObject) -> str:
+        return "做题时先把两边概念各自的类型、对象层级或长度定义写出来，再判断结论。"
 
     def _normalize_text(self, text: str) -> str:
         lowered = text.lower()
@@ -419,6 +547,15 @@ class NodeWriterService:
         lowered = re.sub(r"[^a-z0-9]+", " ", lowered)
         tokens = [token for token in lowered.split() if token not in {"the", "a", "an", "in", "of"}]
         return " ".join(tokens)
+
+    def _node_type_label(self, node_type: KnowledgeNodeType) -> str:
+        mapping = {
+            KnowledgeNodeType.ERROR: "错误节点",
+            KnowledgeNodeType.CONCEPT: "概念节点",
+            KnowledgeNodeType.CONTRAST: "对比节点",
+            KnowledgeNodeType.PITFALL: "易错点节点",
+        }
+        return mapping[node_type]
 
     @staticmethod
     def _note_kind_for_node(node_type: KnowledgeNodeType) -> NoteKind:

@@ -42,6 +42,11 @@ def test_smart_error_capture_creates_supporting_nodes_and_edges() -> None:
     assert payload["error"]["trigger_mistake"]
     assert payload["error"]["corrective_rule"]
     assert payload["error"]["next_time_checklist"]
+    assert all(
+        "The learner repeatedly confuses" not in item["summary"]
+        for item in payload["related_nodes"]
+    )
+    assert any(item["title"].startswith("易错点：") for item in payload["related_nodes"])
     assert "telemetry" in payload
     assert "error_extractor" in payload["telemetry"]
 
@@ -54,6 +59,9 @@ def test_smart_error_capture_creates_supporting_nodes_and_edges() -> None:
     assert "## 下次检查清单" in error_note_text
 
     support_paths = [item["note_path"] for item in payload["related_nodes"] if item["note_path"]]
+    support_note_text = (settings.vault_root / support_paths[0]).read_text(encoding="utf-8")
+    assert "## 核心判断规则" in support_note_text
+    assert "## 关键区分" in support_note_text
     assert any(path.startswith("20 Smart/") for path in support_paths)
 
     container = build_container(settings)
@@ -158,6 +166,7 @@ def test_smart_node_pack_builds_relations_between_related_errors() -> None:
     payload = pack.json()
     assert payload["stored_edges"] >= 1
     assert payload["pack"]["edges"]
+    assert len(payload["pack"]["edges"]) <= 3
     assert payload["pack"]["recommended_output_shape"]
     assert payload["pack"]["token_budget_hint"] >= 300
     assert payload["pack"]["condensed_context"]

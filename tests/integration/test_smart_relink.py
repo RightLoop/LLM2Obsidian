@@ -54,6 +54,7 @@ def test_smart_relink_dry_run_returns_preview() -> None:
     assert payload["action_preview"]["dry_run"] is True
     assert payload["review_id"] is None
     assert payload["related_section_markdown"].startswith("- ")
+    assert payload["related_section_markdown"].count("\n") <= 2
 
 
 def test_smart_relink_creates_review_item() -> None:
@@ -104,6 +105,7 @@ def test_smart_relink_creates_review_item() -> None:
     payload = response.json()
     assert payload["review_id"] is not None
     assert payload["proposal_path"]
+    assert payload["related_section_markdown"].count("\n") <= 2
 
     pending = client.get("/review/pending")
     assert pending.status_code == 200
