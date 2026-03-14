@@ -333,7 +333,7 @@ class NodeWriterService:
         if contrast_title:
             nodes.append(
                 KnowledgeNodeSchema(
-                    node_key=f"contrast/{slugify(contrast_title)}",
+                    node_key=self._contrast_node_key(error, contrast_title),
                     node_type=KnowledgeNodeType.CONTRAST,
                     title=contrast_title,
                     summary=self._contrast_summary(error),
@@ -347,6 +347,7 @@ class NodeWriterService:
                         "avoid_confusion": error.incorrect_assumption,
                         "related_concepts": error.related_concepts,
                         "derived_from_error": error.error_signature,
+                        "legacy_node_keys": self._legacy_contrast_node_keys(error, contrast_title),
                         "evidence": error.evidence,
                     },
                 )
@@ -357,6 +358,11 @@ class NodeWriterService:
         direct = self._load_existing_node(candidate.node_key)
         if direct is not None:
             return direct
+        if candidate.node_type == KnowledgeNodeType.CONTRAST:
+            for alias_key in candidate.metadata.get("legacy_node_keys", []):
+                existing = self._load_existing_node(str(alias_key))
+                if existing is not None:
+                    return existing
         normalized_title = self._normalize_text(candidate.title)
         with self.session_factory() as session:
             repo = KnowledgeNodeRepository(session)
@@ -364,6 +370,11 @@ class NodeWriterService:
                 if entity.node_type != candidate.node_type.value:
                     continue
                 existing = self._entity_to_schema(entity)
+                if (
+                    candidate.node_type == KnowledgeNodeType.CONTRAST
+                    and existing.metadata.get("derived_from_error") == candidate.metadata.get("derived_from_error")
+                ):
+                    return existing
                 if self._normalize_text(existing.title) == normalized_title:
                     return existing
         return None
@@ -438,6 +449,30 @@ class NodeWriterService:
         if "arr" in error.incorrect_assumption.lower() and "&arr" in " ".join(error.evidence).lower():
             return "对比：arr vs &arr"
         return None
+
+    def _contrast_node_key(self, error: ErrorObject, title: str) -> str:
+        if error.error_signature in {
+            "sizeof-vs-strlen",
+            "arr-vs-address-of-array",
+            "char-pointer-vs-char-array",
+        }:
+            return f"contrast/{slugify(error.error_signature)}"
+        return f"contrast/{slugify(title)}"
+
+    def _legacy_contrast_node_keys(self, error: ErrorObject, title: str) -> list[str]:
+        keys = {
+            f"contrast/{slugify(title)}",
+            f"contrast/{slugify(self._legacy_contrast_title(error))}",
+        }
+        return sorted(key for key in keys if key)
+
+    def _legacy_contrast_title(self, error: ErrorObject) -> str:
+        mapping = {
+            "sizeof-vs-strlen": "Contrast: sizeof vs strlen",
+            "arr-vs-address-of-array": "Contrast: arr vs &arr",
+            "char-pointer-vs-char-array": "Contrast: char* vs char[]",
+        }
+        return mapping.get(error.error_signature, self._contrast_title(error) or error.error_signature)
 
     def _concept_title(self, concept: str) -> str:
         mapping = {

@@ -296,11 +296,7 @@ class ErrorExtractorService:
 
     def _sanitize(self, raw: dict[str, object], payload: ErrorCaptureRequest) -> dict[str, object]:
         fallback = self._fallback(payload)
-        signature = self._canonicalize_signature(str(raw.get("error_signature") or ""), payload)
-        if fallback.error_signature in KNOWN_SIGNATURES:
-            signature = fallback.error_signature
-        elif signature not in KNOWN_SIGNATURES:
-            signature = fallback.error_signature
+        signature = self._resolve_signature(raw, payload, fallback.error_signature)
         merged_concepts = self._merge_concepts(
             self._coerce_list(raw.get("related_concepts")),
             fallback.related_concepts,
@@ -336,6 +332,33 @@ class ErrorExtractorService:
             "tags": self._normalize_tags(self._coerce_list(raw.get("tags")) or fallback.tags),
             "confidence": self._coerce_confidence(raw.get("confidence")),
         }
+
+    def _resolve_signature(
+        self,
+        raw: dict[str, object],
+        payload: ErrorCaptureRequest,
+        fallback_signature: str,
+    ) -> str:
+        model_signature = self._canonicalize_signature(str(raw.get("error_signature") or ""), payload)
+        fallback_known = fallback_signature in KNOWN_SIGNATURES
+        model_known = model_signature in KNOWN_SIGNATURES
+        if model_known and fallback_known and model_signature != fallback_signature:
+            if self._should_prefer_fallback_signature():
+                return fallback_signature
+            return model_signature
+        if model_known:
+            return model_signature
+        if fallback_known:
+            return fallback_signature
+        return model_signature or fallback_signature
+
+    def _should_prefer_fallback_signature(self) -> bool:
+        telemetry = self.last_telemetry or {}
+        provider = str(telemetry.get("provider") or "").lower()
+        response_chars = int(telemetry.get("response_chars") or 0)
+        return provider == "ollama" and (
+            bool(telemetry.get("repaired")) or response_chars <= 10
+        )
 
     def _fallback(self, payload: ErrorCaptureRequest) -> ErrorObject:
         signature = self._infer_signature(payload.prompt, payload.code, payload.user_analysis)
