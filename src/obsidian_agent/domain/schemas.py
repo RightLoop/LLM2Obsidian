@@ -171,8 +171,11 @@ class ErrorObject(BaseModel):
     language: str = "c"
     error_signature: str
     summary: str
+    trigger_mistake: str
     root_cause: str
     incorrect_assumption: str
+    corrective_rule: str
+    next_time_checklist: list[str] = Field(default_factory=list)
     evidence: list[str] = Field(default_factory=list)
     related_concepts: list[str] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)

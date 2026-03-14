@@ -39,6 +39,9 @@ def test_smart_error_capture_creates_supporting_nodes_and_edges() -> None:
     assert payload["related_nodes"]
     assert payload["stored_edges"] >= 2
     assert any(item["node_type"] == "contrast" for item in payload["related_nodes"])
+    assert payload["error"]["trigger_mistake"]
+    assert payload["error"]["corrective_rule"]
+    assert payload["error"]["next_time_checklist"]
     assert "telemetry" in payload
     assert "error_extractor" in payload["telemetry"]
 
@@ -46,6 +49,9 @@ def test_smart_error_capture_creates_supporting_nodes_and_edges() -> None:
     assert error_note_path.startswith("21 Errors/")
     error_note_text = (settings.vault_root / error_note_path).read_text(encoding="utf-8")
     assert "# sizeof vs strlen confusion" in error_note_text
+    assert "## 触发错误" in error_note_text
+    assert "## 正确判断规则" in error_note_text
+    assert "## 下次检查清单" in error_note_text
 
     support_paths = [item["note_path"] for item in payload["related_nodes"] if item["note_path"]]
     assert any(path.startswith("20 Smart/") for path in support_paths)

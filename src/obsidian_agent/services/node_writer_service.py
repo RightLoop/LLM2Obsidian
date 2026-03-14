@@ -129,8 +129,14 @@ class NodeWriterService:
                 {
                     "title": error.title,
                     "summary": error.summary,
+                    "trigger_mistake": error.trigger_mistake,
                     "root_cause": error.root_cause,
                     "incorrect_assumption": error.incorrect_assumption,
+                    "corrective_rule": error.corrective_rule,
+                    "next_time_checklist": "\n".join(
+                        f"- {item}" for item in error.next_time_checklist
+                    )
+                    or "-",
                     "evidence": "\n".join(f"- {item}" for item in error.evidence) or "-",
                     "related_concepts": "\n".join(f"- {item}" for item in error.related_concepts) or "-",
                     "recommended_practice": "\n".join(
@@ -163,8 +169,11 @@ class NodeWriterService:
             metadata={
                 "language": error.language,
                 "error_signature": error.error_signature,
+                "trigger_mistake": error.trigger_mistake,
                 "root_cause": error.root_cause,
                 "incorrect_assumption": error.incorrect_assumption,
+                "corrective_rule": error.corrective_rule,
+                "next_time_checklist": error.next_time_checklist,
                 "weaknesses": [item.model_dump(mode="json") for item in weaknesses],
             },
         )

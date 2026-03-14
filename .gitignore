@@ -20,6 +20,9 @@ data/processed/*.json
 data/test_runs/
 .worktrees/
 output/test_*.json
+output/quality-tuning-rounds/*.json
+output/quality-tuning-rounds/*.md
+!output/quality-tuning-rounds/scorecard_template.md
 pytest-cache-files-*/
 Thumbs.db
 .DS_Store
