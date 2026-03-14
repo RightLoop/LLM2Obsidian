@@ -20,6 +20,8 @@ class ObsidianService:
         self.settings.vault_root.mkdir(parents=True, exist_ok=True)
         self.settings.inbox_folder_path.mkdir(parents=True, exist_ok=True)
         self.settings.review_folder_path.mkdir(parents=True, exist_ok=True)
+        self.settings.smart_nodes_folder_path.mkdir(parents=True, exist_ok=True)
+        self.settings.smart_errors_folder_path.mkdir(parents=True, exist_ok=True)
 
     def _path(self, vault_path: str) -> Path:
         return self.settings.vault_root / vault_path

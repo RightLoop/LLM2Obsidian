@@ -22,13 +22,26 @@
             </label>
           </div>
           <p class="lede" data-i18n="heroLede">
-            配置模型与 Obsidian 连接，并在浏览器里直接运行核心工作流。
+            配置模型和 Obsidian 连接，并在浏览器里直接运行核心工作流。
           </p>
+          <div class="token-row">
+            <input
+              id="adminToken"
+              type="password"
+              data-i18n-placeholder="adminTokenPlaceholder"
+              placeholder="输入 UI 管理 token"
+            >
+            <button id="saveAdminToken" class="secondary-button" data-i18n="saveAdminToken">
+              保存 Token
+            </button>
+          </div>
         </div>
         <div class="status-card">
           <span id="healthBadge" class="badge" data-i18n="healthChecking">检查中</span>
           <p id="envPath" class="env-path" data-i18n="envLoading">正在加载运行时信息...</p>
-          <button id="reloadRuntime" class="secondary-button" data-i18n="reloadRuntime">重新加载运行时</button>
+          <button id="reloadRuntime" class="secondary-button" data-i18n="reloadRuntime">
+            重新加载运行时
+          </button>
         </div>
       </header>
 
@@ -39,7 +52,9 @@
             <button id="saveConfig" class="primary-button" data-i18n="saveConfig">保存配置</button>
           </div>
           <form id="configForm" class="config-grid">
+            <label><span data-i18n="uiAdminToken">UI 管理 Token</span><input name="ui_admin_token" type="password"></label>
             <label><span data-i18n="llmProvider">LLM 提供方</span><input name="llm_provider" value="deepseek"></label>
+            <label><span data-i18n="embeddingsProvider">Embedding 提供方</span><input name="embeddings_provider" value="deterministic"></label>
             <label><span data-i18n="obsidianMode">Obsidian 模式</span><input name="obsidian_mode" value="auto"></label>
             <label><span data-i18n="vaultRoot">Vault 根目录</span><input name="vault_root"></label>
             <label><span data-i18n="sqlitePath">SQLite 路径</span><input name="sqlite_path"></label>
@@ -52,9 +67,16 @@
             <label><span data-i18n="openaiApiKey">OpenAI API Key</span><input name="openai_api_key" type="password"></label>
             <label><span data-i18n="openaiBaseUrl">OpenAI Base URL</span><input name="openai_base_url"></label>
             <label><span data-i18n="openaiModel">OpenAI 模型</span><input name="openai_model"></label>
+            <label><span data-i18n="ollamaBaseUrl">Ollama Base URL</span><input name="ollama_base_url"></label>
+            <label><span data-i18n="ollamaChatModel">Ollama Chat 模型</span><input name="ollama_chat_model"></label>
+            <label><span data-i18n="ollamaJsonModel">Ollama JSON 模型</span><input name="ollama_json_model"></label>
+            <label><span data-i18n="ollamaEmbeddingModel">Ollama Embedding 模型</span><input name="ollama_embedding_model"></label>
+            <label><span data-i18n="ollamaTimeout">Ollama 超时</span><input name="ollama_timeout_seconds" type="number" step="1"></label>
             <label><span data-i18n="logLevel">日志级别</span><input name="log_level"></label>
             <label><span data-i18n="reviewFolder">Review 目录</span><input name="review_folder"></label>
             <label><span data-i18n="inboxFolder">Inbox 目录</span><input name="inbox_folder"></label>
+            <label><span data-i18n="smartNodesFolder">Smart Nodes 目录</span><input name="smart_nodes_folder"></label>
+            <label><span data-i18n="smartErrorsFolder">Error Nodes 目录</span><input name="smart_errors_folder"></label>
             <label><span data-i18n="httpTimeout">HTTP 超时</span><input name="http_timeout_seconds" type="number" step="0.5"></label>
             <label><span data-i18n="retryAttempts">重试次数</span><input name="http_retry_attempts" type="number" step="1"></label>
             <label><span data-i18n="retryBackoff">重试退避</span><input name="http_retry_backoff_seconds" type="number" step="0.1"></label>
@@ -68,7 +90,7 @@
             <h2 data-i18n="quickActions">快捷操作</h2>
           </div>
           <div class="stack">
-            <button id="seedDemo" class="primary-button" data-i18n="seedDemo">生成演示知识库</button>
+            <button id="seedDemo" class="primary-button" data-i18n="seedDemo">生成示例知识库</button>
             <button id="reindex" class="primary-button" data-i18n="reindex">重建索引</button>
             <div class="inline-form">
               <input id="weekKey" value="2026-W11" aria-label="Week key">
@@ -85,6 +107,20 @@
             <input id="captureTitle" data-i18n-placeholder="captureTitlePlaceholder" placeholder="标题">
             <textarea id="captureText" rows="8" data-i18n-placeholder="captureTextPlaceholder" placeholder="粘贴一段笔记、文章摘录或想法..."></textarea>
             <button id="captureSubmit" class="primary-button" data-i18n="captureToInbox">采集到 Inbox</button>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2 data-i18n="smartErrorCapture">错题智能分析</h2>
+          </div>
+          <div class="stack">
+            <input id="smartTitle" data-i18n-placeholder="smartTitlePlaceholder" placeholder="例如：把 sizeof 当成 strlen">
+            <textarea id="smartPrompt" rows="5" data-i18n-placeholder="smartPromptPlaceholder" placeholder="描述题目、错误结论和正确答案。"></textarea>
+            <textarea id="smartCode" rows="6" data-i18n-placeholder="smartCodePlaceholder" placeholder="贴上相关的 C 代码。"></textarea>
+            <textarea id="smartAnalysis" rows="4" data-i18n-placeholder="smartAnalysisPlaceholder" placeholder="写下你当时的思路。"></textarea>
+            <button id="smartCaptureSubmit" class="primary-button" data-i18n="runSmartCapture">生成 Error Node</button>
+            <div id="smartResults" class="result-list"></div>
           </div>
         </section>
 
@@ -132,4 +168,4 @@
 
     <script src="/ui/assets/app.js" defer></script>
   </body>
-  </html>
+</html>

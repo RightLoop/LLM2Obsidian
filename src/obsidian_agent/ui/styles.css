@@ -104,6 +104,13 @@ h1 {
   font-size: 1rem;
 }
 
+.token-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  margin-top: 18px;
+}
+
 .env-path {
   margin: 14px 0;
   color: var(--muted);
@@ -245,6 +252,11 @@ button:hover {
 
 .result-card small {
   color: var(--muted);
+}
+
+.result-card ul {
+  margin: 10px 0 6px;
+  padding-left: 18px;
 }
 
 .maintenance-buttons {

@@ -26,6 +26,11 @@
       "path": "tasks/weekly_digest.md.tmpl",
       "kind": "template",
       "purpose": "Render weekly digest notes."
+    },
+    {
+      "path": "tasks/error_node.md.tmpl",
+      "kind": "template",
+      "purpose": "Render smart error nodes from structured diagnostics."
     }
   ]
 }

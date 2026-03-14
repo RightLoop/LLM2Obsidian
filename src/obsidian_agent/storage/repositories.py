@@ -2,14 +2,30 @@
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from obsidian_agent.domain.enums import JobState, ReviewState
-from obsidian_agent.domain.models import IngestionJob, MaintenanceReport, NoteLink, NoteRecord, ReviewItem
-from obsidian_agent.domain.schemas import NoteRecordSchema, ReviewProposal
+from obsidian_agent.domain.models import (
+    ErrorOccurrence,
+    IngestionJob,
+    KnowledgeEdge,
+    KnowledgeNode,
+    MaintenanceReport,
+    NoteLink,
+    NoteRecord,
+    ReviewItem,
+)
+from obsidian_agent.domain.schemas import (
+    ErrorObject,
+    KnowledgeEdgeSchema,
+    KnowledgeNodeSchema,
+    NoteRecordSchema,
+    ReviewProposal,
+)
 
 
 class NoteRepository:
@@ -168,3 +184,78 @@ class MaintenanceRepository:
         self.session.commit()
         self.session.refresh(report)
         return report
+
+
+class KnowledgeNodeRepository:
+    """Knowledge node repository."""
+
+    def __init__(self, session: Session) -> None:
+        self.session = session
+
+    def upsert(self, data: KnowledgeNodeSchema) -> KnowledgeNode:
+        entity = self.session.scalar(select(KnowledgeNode).where(KnowledgeNode.node_key == data.node_key))
+        payload = {
+            "node_type": data.node_type.value,
+            "title": data.title,
+            "summary": data.summary,
+            "note_path": data.note_path,
+            "source_note_path": data.source_note_path,
+            "tags_json": json.dumps(data.tags, ensure_ascii=False),
+            "metadata_json": json.dumps(data.metadata, ensure_ascii=False),
+        }
+        if entity:
+            for key, value in payload.items():
+                setattr(entity, key, value)
+        else:
+            entity = KnowledgeNode(node_key=data.node_key, **payload)
+            self.session.add(entity)
+        self.session.commit()
+        self.session.refresh(entity)
+        return entity
+
+    def get_by_key(self, node_key: str) -> KnowledgeNode | None:
+        return self.session.scalar(select(KnowledgeNode).where(KnowledgeNode.node_key == node_key))
+
+    def list_all(self) -> list[KnowledgeNode]:
+        return list(self.session.scalars(select(KnowledgeNode).order_by(KnowledgeNode.node_key)).all())
+
+
+class KnowledgeEdgeRepository:
+    """Knowledge edge repository."""
+
+    def __init__(self, session: Session) -> None:
+        self.session = session
+
+    def create(self, data: KnowledgeEdgeSchema, from_node_id: int | None, to_node_id: int | None) -> KnowledgeEdge:
+        entity = KnowledgeEdge(
+            from_node_id=from_node_id,
+            to_node_id=to_node_id,
+            relation_type=data.relation_type.value,
+            reason=data.reason,
+            confidence=data.confidence,
+        )
+        self.session.add(entity)
+        self.session.commit()
+        self.session.refresh(entity)
+        return entity
+
+
+class ErrorOccurrenceRepository:
+    """Captured error occurrences repository."""
+
+    def __init__(self, session: Session) -> None:
+        self.session = session
+
+    def create(self, error: ErrorObject, raw_input: str, node_id: int | None, source_note_path: str | None) -> ErrorOccurrence:
+        entity = ErrorOccurrence(
+            node_id=node_id,
+            source_note_path=source_note_path,
+            title=error.title,
+            language=error.language,
+            error_signature=error.error_signature,
+            raw_input=raw_input,
+        )
+        self.session.add(entity)
+        self.session.commit()
+        self.session.refresh(entity)
+        return entity

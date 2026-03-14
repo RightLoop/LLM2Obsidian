@@ -12,6 +12,10 @@ class NoteKind(StrEnum):
     ENTITY = "entity"
     REVIEW = "review"
     DIGEST = "digest"
+    ERROR = "error"
+    CONCEPT = "concept"
+    CONTRAST = "contrast"
+    PITFALL = "pitfall"
 
 
 class NoteStatus(StrEnum):
@@ -65,3 +69,20 @@ class ReviewState(StrEnum):
     APPROVED = "approved"
     REJECTED = "rejected"
     APPLIED = "applied"
+
+
+class KnowledgeNodeType(StrEnum):
+    ERROR = "error"
+    CONCEPT = "concept"
+    CONTRAST = "contrast"
+    PITFALL = "pitfall"
+
+
+class KnowledgeRelationType(StrEnum):
+    REVEALS_GAP_IN = "reveals_gap_in"
+    REQUIRES = "requires"
+    CONTRASTS_WITH = "contrasts_with"
+    COMMONLY_CONFUSED_WITH = "commonly_confused_with"
+    IS_EXAMPLE_OF = "is_example_of"
+    FIXES = "fixes"
+    REPEATED_IN = "repeated_in"
