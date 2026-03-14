@@ -91,6 +91,7 @@ python -m compileall src scripts
 - Prompt assets live under `src/obsidian_agent/prompts/` and are tracked by `manifest.json`.
 - The built-in control panel is served from `/` and `/ui`.
 - The control panel can edit `.env`, reload runtime settings, seed demo data, reindex, capture text, run smart C-error capture, preview node packs, build teaching packs, create relink reviews, search notes, inspect review items, and run maintenance jobs.
+- Smart error capture now writes an `ErrorNode` plus deduplicated supporting `ConceptNode` and `PitfallNode` notes, and records edges to them.
 - `/capture/url` blocks loopback and private-network targets to reduce SSRF risk.
 
 See [docs/operations.md](/W:/codex/codex/docs/operations.md), [docs/api.md](/W:/codex/codex/docs/api.md), and [docs/prompts.md](/W:/codex/codex/docs/prompts.md) for details.

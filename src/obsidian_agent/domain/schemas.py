@@ -221,6 +221,7 @@ class SmartErrorCaptureResponse(BaseModel):
     node: KnowledgeNodeSchema
     related_nodes: list[KnowledgeNodeSchema] = Field(default_factory=list)
     action_preview: ActionPreview | None = None
+    stored_edges: int = 0
 
 
 class NodePackRequest(BaseModel):
