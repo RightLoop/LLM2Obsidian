@@ -27,11 +27,18 @@ class LLMService:
     def __init__(self, client: JsonLLMClient | None = None) -> None:
         self.client = client
 
+    async def run_structured_task(self, instructions: str, input_text: str) -> dict[str, object] | None:
+        """Execute a structured generation task when a provider is available."""
+
+        if not self.client:
+            return None
+        return await self.client.create_json_response(instructions=instructions, input_text=input_text)
+
     async def normalize_capture(self, payload: CaptureInput) -> NormalizedCapture:
         """Return a structured capture payload."""
 
         if self.client:
-            raw = await self.client.create_json_response(
+            raw = await self.run_structured_task(
                 instructions=(
                     "Return JSON with keys: title, summary, entities, topics, tags, "
                     "decision, confidence, conflicts, key_points, raw_excerpt. "

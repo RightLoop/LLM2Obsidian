@@ -12,18 +12,24 @@ from sqlalchemy.orm import sessionmaker
 from obsidian_agent.config import Settings, get_settings
 from obsidian_agent.integrations.deepseek_client import DeepSeekChatClient
 from obsidian_agent.integrations.obsidian_rest_client import ObsidianRestClient
+from obsidian_agent.integrations.ollama_client import OllamaChatClient
+from obsidian_agent.integrations.ollama_embeddings_client import OllamaEmbeddingsClient
 from obsidian_agent.integrations.openai_client import OpenAIResponsesClient
 from obsidian_agent.logging import configure_logging, trace_middleware
 from obsidian_agent.services.capture_service import CaptureService
-from obsidian_agent.services.embeddings_service import EmbeddingsService
+from obsidian_agent.services.embeddings_service import DeterministicEmbeddingsClient, EmbeddingsService
+from obsidian_agent.services.error_extractor_service import ErrorExtractorService
 from obsidian_agent.services.indexing_service import IndexingService
 from obsidian_agent.services.llm_service import LLMService
 from obsidian_agent.services.maintenance_service import MaintenanceService
+from obsidian_agent.services.node_writer_service import NodeWriterService
 from obsidian_agent.services.normalize_service import NormalizeService
 from obsidian_agent.services.obsidian_service import ObsidianService
 from obsidian_agent.services.retrieval_service import RetrievalService
 from obsidian_agent.services.review_service import ReviewService
+from obsidian_agent.services.smart_capture_service import SmartCaptureService
 from obsidian_agent.services.synthesis_service import SynthesisService
+from obsidian_agent.services.weakness_diagnoser_service import WeaknessDiagnoserService
 from obsidian_agent.storage.db import create_session_factory
 from obsidian_agent.storage.vector_store import VectorStore
 from obsidian_agent.workflows.capture_workflow import CaptureWorkflow
@@ -49,6 +55,7 @@ class AppContainer:
     maintenance_service: MaintenanceService
     maintenance_workflow: MaintenanceWorkflow
     link_workflow: LinkWorkflow
+    smart_capture_service: SmartCaptureService
 
 
 def _template_path(name: str) -> Path:
@@ -96,8 +103,29 @@ def build_container(settings: Settings | None = None) -> AppContainer:
             retry_attempts=settings.http_retry_attempts,
             retry_backoff_seconds=settings.http_retry_backoff_seconds,
         )
+    elif provider == "ollama":
+        llm_client = OllamaChatClient(
+            base_url=settings.ollama_base_url,
+            model=settings.ollama_json_model,
+            timeout_seconds=settings.ollama_timeout_seconds,
+            retry_attempts=settings.http_retry_attempts,
+            retry_backoff_seconds=settings.http_retry_backoff_seconds,
+        )
     llm_service = LLMService(llm_client)
-    embeddings_service = EmbeddingsService()
+    embedding_client = None
+    if settings.embeddings_provider.lower() == "ollama":
+        embedding_client = OllamaEmbeddingsClient(
+            base_url=settings.ollama_base_url,
+            model=settings.ollama_embedding_model,
+            timeout_seconds=settings.ollama_timeout_seconds,
+            retry_attempts=settings.http_retry_attempts,
+            retry_backoff_seconds=settings.http_retry_backoff_seconds,
+        )
+    embeddings_service = EmbeddingsService(
+        provider=settings.embeddings_provider,
+        client=embedding_client,
+        fallback_client=DeterministicEmbeddingsClient(),
+    )
     vector_store = VectorStore(settings.vector_store_path)
     retrieval_service = RetrievalService(session_factory, obsidian_service, embeddings_service, vector_store)
     review_service = ReviewService(
@@ -123,6 +151,15 @@ def build_container(settings: Settings | None = None) -> AppContainer:
     )
     maintenance_workflow = MaintenanceWorkflow(maintenance_service)
     link_workflow = LinkWorkflow(retrieval_service)
+    smart_capture_service = SmartCaptureService(
+        error_extractor=ErrorExtractorService(llm_service),
+        weakness_diagnoser=WeaknessDiagnoserService(),
+        node_writer=NodeWriterService(
+            session_factory=session_factory,
+            obsidian_service=obsidian_service,
+            error_template_path=_template_path("error_node.md.tmpl"),
+        ),
+    )
     return AppContainer(
         settings=settings,
         session_factory=session_factory,
@@ -137,6 +174,7 @@ def build_container(settings: Settings | None = None) -> AppContainer:
         maintenance_service=maintenance_service,
         maintenance_workflow=maintenance_workflow,
         link_workflow=link_workflow,
+        smart_capture_service=smart_capture_service,
     )
 
 
@@ -146,22 +184,24 @@ def get_container(request: Request) -> AppContainer:
     return request.app.state.container
 
 
-def create_app() -> FastAPI:
+def create_app(settings: Settings | None = None) -> FastAPI:
     """Create the FastAPI app."""
 
     from obsidian_agent.api.routes_capture import router as capture_router
     from obsidian_agent.api.routes_maintenance import router as maintenance_router
     from obsidian_agent.api.routes_review import router as review_router
     from obsidian_agent.api.routes_search import router as search_router
+    from obsidian_agent.api.routes_smart import router as smart_router
     from obsidian_agent.api.routes_ui import router as ui_router
 
     app = FastAPI(title="LLM2Obsidian")
     app.middleware("http")(trace_middleware)
-    app.state.container = build_container()
+    app.state.container = build_container(settings)
     app.mount("/ui/assets", StaticFiles(directory=_ui_path("")), name="ui-assets")
     app.include_router(ui_router)
     app.include_router(capture_router)
     app.include_router(search_router)
+    app.include_router(smart_router)
     app.include_router(review_router)
     app.include_router(maintenance_router)
 

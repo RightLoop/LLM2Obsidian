@@ -7,6 +7,8 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 from obsidian_agent.domain.enums import (
+    KnowledgeNodeType,
+    KnowledgeRelationType,
     NoteKind,
     NoteStatus,
     ProposalType,
@@ -152,3 +154,70 @@ class ActionPreview(BaseModel):
     action: str
     target_path: str
     details: dict[str, object] = Field(default_factory=dict)
+
+
+class ErrorCaptureRequest(BaseModel):
+    title: str | None = None
+    prompt: str = Field(min_length=10)
+    code: str = ""
+    user_analysis: str = ""
+    language: str = "c"
+    source_ref: str = ""
+
+
+class ErrorObject(BaseModel):
+    title: str
+    language: str = "c"
+    error_signature: str
+    summary: str
+    root_cause: str
+    incorrect_assumption: str
+    evidence: list[str] = Field(default_factory=list)
+    related_concepts: list[str] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)
+    confidence: float = 0.5
+
+
+class WeaknessObject(BaseModel):
+    name: str
+    summary: str
+    gap_type: str
+    recommended_practice: str
+    related_concepts: list[str] = Field(default_factory=list)
+    confidence: float = 0.5
+
+
+class KnowledgeNodeSchema(BaseModel):
+    id: int | None = None
+    node_key: str
+    node_type: KnowledgeNodeType
+    title: str
+    summary: str
+    note_path: str | None = None
+    source_note_path: str | None = None
+    tags: list[str] = Field(default_factory=list)
+    metadata: dict[str, object] = Field(default_factory=dict)
+
+
+class KnowledgeEdgeSchema(BaseModel):
+    id: int | None = None
+    from_node_key: str
+    to_node_key: str
+    relation_type: KnowledgeRelationType
+    reason: str
+    confidence: float = 0.5
+
+
+class RelationPack(BaseModel):
+    anchor: KnowledgeNodeSchema
+    related_nodes: list[KnowledgeNodeSchema] = Field(default_factory=list)
+    edges: list[KnowledgeEdgeSchema] = Field(default_factory=list)
+    summary: str = ""
+
+
+class SmartErrorCaptureResponse(BaseModel):
+    error: ErrorObject
+    weaknesses: list[WeaknessObject] = Field(default_factory=list)
+    node: KnowledgeNodeSchema
+    related_nodes: list[KnowledgeNodeSchema] = Field(default_factory=list)
+    action_preview: ActionPreview | None = None

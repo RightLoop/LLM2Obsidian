@@ -17,6 +17,9 @@ build/
 *.pyd
 *.egg-info/
 data/processed/*.json
+data/test_runs/
+.worktrees/
+output/test_*.json
 pytest-cache-files-*/
 Thumbs.db
 .DS_Store
