@@ -281,6 +281,45 @@ class KnowledgeEdgeRepository:
             self.session.refresh(entity)
         return created
 
+    def create_if_missing_batch(
+        self,
+        from_node_id: int | None,
+        edges: list[KnowledgeEdgeSchema],
+        node_ids_by_key: dict[str, int],
+    ) -> list[KnowledgeEdge]:
+        if from_node_id is None:
+            return []
+        existing = list(
+            self.session.scalars(select(KnowledgeEdge).where(KnowledgeEdge.from_node_id == from_node_id)).all()
+        )
+        existing_keys = {
+            (row.to_node_id, row.relation_type)
+            for row in existing
+            if row.to_node_id is not None
+        }
+        created: list[KnowledgeEdge] = []
+        for edge in edges:
+            target_id = node_ids_by_key.get(edge.to_node_key)
+            if target_id is None:
+                continue
+            key = (target_id, edge.relation_type.value)
+            if key in existing_keys:
+                continue
+            entity = KnowledgeEdge(
+                from_node_id=from_node_id,
+                to_node_id=target_id,
+                relation_type=edge.relation_type.value,
+                reason=edge.reason,
+                confidence=edge.confidence,
+            )
+            self.session.add(entity)
+            created.append(entity)
+            existing_keys.add(key)
+        self.session.commit()
+        for entity in created:
+            self.session.refresh(entity)
+        return created
+
 
 class ErrorOccurrenceRepository:
     """Captured error occurrences repository."""

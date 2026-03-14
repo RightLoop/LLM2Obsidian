@@ -320,6 +320,9 @@ function renderSmartResult(payload) {
   const weaknesses = (payload.weaknesses || [])
     .map((item) => `<li>${item.name}: ${item.summary}</li>`)
     .join("");
+  const generatedNodes = (payload.related_nodes || [])
+    .map((item) => `<li>${item.node_type}: ${item.title}</li>`)
+    .join("");
   const relations = (((payload.pack || {}).edges) || [])
     .map((item) => `<li>${item.relation_type} -> ${item.to_node_key} (${item.confidence})</li>`)
     .join("");
@@ -337,11 +340,12 @@ function renderSmartResult(payload) {
   const secondary = payload.error
     ? payload.error.root_cause
     : (payload.overview || (payload.pack ? payload.pack.anchor.summary : ""));
-  const listHtml = weaknesses || teachingSections || relations || drills || "<li>-</li>";
+  const listHtml = [weaknesses, generatedNodes, teachingSections, relations, drills].filter((item) => item).join("") || "<li>-</li>";
   const markdown = payload.markdown ? `<pre class="console-output">${payload.markdown}</pre>` : "";
   const reviewMeta = payload.review_id
     ? `<small>review #${payload.review_id}: ${payload.proposal_path || ""}</small>`
     : "";
+  const edgeMeta = payload.stored_edges ? `<small>stored edges: ${payload.stored_edges}</small>` : "";
   target.innerHTML = `
     <article class="result-card">
       <strong>${title}</strong>
@@ -349,6 +353,7 @@ function renderSmartResult(payload) {
       <div>${secondary}</div>
       <ul>${listHtml}</ul>
       ${preview}
+      ${edgeMeta}
       ${reviewMeta}
       ${markdown}
     </article>

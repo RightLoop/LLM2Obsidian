@@ -24,11 +24,16 @@ class SmartCaptureService:
     async def capture_error(self, payload: ErrorCaptureRequest) -> SmartErrorCaptureResponse:
         error = await self.error_extractor.extract(payload)
         weaknesses = await self.weakness_diagnoser.diagnose(error)
-        node, action_preview = await self.node_writer.write_error_node(payload, error, weaknesses)
+        node, related_nodes, action_preview, stored_edges = await self.node_writer.write_error_bundle(
+            payload,
+            error,
+            weaknesses,
+        )
         return SmartErrorCaptureResponse(
             error=error,
             weaknesses=weaknesses,
             node=node,
-            related_nodes=[],
-            action_preview=action_preview if hasattr(action_preview, "model_dump") else None,
+            related_nodes=related_nodes,
+            action_preview=action_preview,
+            stored_edges=stored_edges,
         )

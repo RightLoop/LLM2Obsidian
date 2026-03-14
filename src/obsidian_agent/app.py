@@ -176,6 +176,7 @@ def build_container(settings: Settings | None = None) -> AppContainer:
             session_factory=session_factory,
             obsidian_service=obsidian_service,
             error_template_path=_template_path("error_node.md.tmpl"),
+            smart_node_template_path=_template_path("smart_node.md.tmpl"),
         ),
     )
     smart_node_pack_service = SmartNodePackService(

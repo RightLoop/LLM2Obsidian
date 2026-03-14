@@ -61,6 +61,7 @@ curl -X POST http://127.0.0.1:8000/smart/error-capture ^
 ```
 
 This creates an Error Node note under the configured smart error folder and records a local `knowledge_nodes` / `error_occurrences` entry.
+The same call now also creates or reuses supporting Concept and Pitfall nodes under the smart nodes folder.
 
 To preview mined relations around that node:
 
