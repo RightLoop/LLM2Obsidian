@@ -124,7 +124,14 @@
               <input id="nodePackKey" data-i18n-placeholder="nodePackPlaceholder" placeholder="输入 node_key，例如 error/sizeof-vs-strlen">
               <button id="nodePackSubmit" class="secondary-button" data-i18n="runNodePack">生成 Node Pack</button>
             </div>
-            <button id="teachSubmit" class="secondary-button" data-i18n="runTeachPack">生成 Teaching Pack</button>
+            <div class="inline-form">
+              <select id="teachMode" aria-label="Teaching mode">
+                <option value="auto" data-i18n="teachingModeAuto">自动</option>
+                <option value="local" data-i18n="teachingModeLocal">本地</option>
+                <option value="remote" data-i18n="teachingModeRemote">远端</option>
+              </select>
+              <button id="teachSubmit" class="secondary-button" data-i18n="runTeachPack">生成 Teaching Pack</button>
+            </div>
             <button id="relinkSubmit" class="secondary-button" data-i18n="runRelink">生成 Relink Review</button>
             <div id="smartResults" class="result-list"></div>
           </div>

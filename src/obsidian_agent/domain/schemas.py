@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -213,6 +214,12 @@ class RelationPack(BaseModel):
     related_nodes: list[KnowledgeNodeSchema] = Field(default_factory=list)
     edges: list[KnowledgeEdgeSchema] = Field(default_factory=list)
     summary: str = ""
+    relation_summary: str = ""
+    weakness_labels: list[str] = Field(default_factory=list)
+    do_not_repeat: list[str] = Field(default_factory=list)
+    recommended_output_shape: str = "teaching_note"
+    token_budget_hint: int = 800
+    condensed_context: str = ""
 
 
 class SmartErrorCaptureResponse(BaseModel):
@@ -244,6 +251,7 @@ class RelatedNodesRequest(BaseModel):
 class TeachingPackRequest(BaseModel):
     node_key: str = Field(min_length=3)
     top_k: int = Field(default=5, ge=1, le=10)
+    delivery_mode: Literal["auto", "local", "remote"] = "auto"
 
 
 class TeachingSection(BaseModel):
@@ -258,6 +266,7 @@ class TeachingPackResponse(BaseModel):
     sections: list[TeachingSection] = Field(default_factory=list)
     drills: list[str] = Field(default_factory=list)
     markdown: str
+    delivery_mode: str = "auto"
     telemetry: dict[str, object] = Field(default_factory=dict)
 
 

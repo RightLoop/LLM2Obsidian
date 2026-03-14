@@ -64,6 +64,9 @@ const translations = {
     runNodePack: "生成 Node Pack",
     runTeachPack: "生成 Teaching Pack",
     runRelink: "生成 Relink Review",
+    teachingModeAuto: "自动",
+    teachingModeLocal: "本地",
+    teachingModeRemote: "远端",
     search: "搜索",
     searchPlaceholder: "搜索笔记",
     runSearch: "执行搜索",
@@ -160,6 +163,9 @@ const translations = {
     runNodePack: "Build Node Pack",
     runTeachPack: "Build Teaching Pack",
     runRelink: "Build Relink Review",
+    teachingModeAuto: "Auto",
+    teachingModeLocal: "Local",
+    teachingModeRemote: "Remote",
     search: "Search",
     searchPlaceholder: "Search notes",
     runSearch: "Run Search",
@@ -347,6 +353,12 @@ function renderSmartResult(payload) {
     ? `<small>review #${payload.review_id}: ${payload.proposal_path || ""}</small>`
     : "";
   const edgeMeta = payload.stored_edges ? `<small>stored edges: ${payload.stored_edges}</small>` : "";
+  const packMeta = payload.pack
+    ? `<small>shape: ${payload.pack.recommended_output_shape || "-"} · budget: ${payload.pack.token_budget_hint || "-"}</small>`
+    : "";
+  const deliveryMeta = payload.delivery_mode
+    ? `<small>delivery: ${payload.delivery_mode}</small>`
+    : "";
   const telemetryMeta = payload.telemetry && Object.keys(payload.telemetry).length
     ? `<small>telemetry: ${JSON.stringify(payload.telemetry)}</small>`
     : "";
@@ -358,6 +370,8 @@ function renderSmartResult(payload) {
       <ul>${listHtml}</ul>
       ${preview}
       ${edgeMeta}
+      ${packMeta}
+      ${deliveryMeta}
       ${telemetryMeta}
       ${reviewMeta}
       ${markdown}
@@ -482,6 +496,7 @@ document.getElementById("teachSubmit").addEventListener("click", async () => {
     body: JSON.stringify({
       node_key: document.getElementById("nodePackKey").value,
       top_k: 5,
+      delivery_mode: document.getElementById("teachMode").value,
     }),
   });
   renderSmartResult(payload);

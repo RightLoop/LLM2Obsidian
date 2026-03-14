@@ -75,10 +75,10 @@ To generate a teaching-oriented explanation from that relation pack:
 ```bash
 curl -X POST http://127.0.0.1:8000/smart/teach ^
   -H "Content-Type: application/json" ^
-  -d "{\"node_key\":\"error/sizeof-vs-strlen\",\"top_k\":5}"
+  -d "{\"node_key\":\"error/sizeof-vs-strlen\",\"top_k\":5,\"delivery_mode\":\"local\"}"
 ```
 
-The smart endpoints now return a `telemetry` object with provider, model, prompt size, response size, and token usage when the active provider exposes usage data.
+The smart endpoints now return a `telemetry` object with provider, model, prompt size, response size, and token usage when the active provider exposes usage data. `POST /smart/teach` also reports the requested and resolved delivery mode plus the relation pack token budget hint.
 
 To inspect nearby smart nodes without generating a teaching pack:
 

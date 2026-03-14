@@ -42,7 +42,7 @@ def test_smart_teach_returns_markdown_and_sections() -> None:
 
     response = client.post(
         "/smart/teach",
-        json={"node_key": first.json()["node"]["node_key"], "top_k": 5},
+        json={"node_key": first.json()["node"]["node_key"], "top_k": 5, "delivery_mode": "remote"},
     )
     assert response.status_code == 200
     payload = response.json()
@@ -51,6 +51,12 @@ def test_smart_teach_returns_markdown_and_sections() -> None:
     assert payload["markdown"].startswith("# ")
     assert "## Practice Drills" in payload["markdown"]
     assert "telemetry" in payload
+    assert payload["delivery_mode"] in {"remote", "local-fallback", "offline-fallback"}
+    assert payload["telemetry"]["delivery_mode_requested"] == "remote"
+    assert payload["telemetry"]["pack_token_budget_hint"] >= 300
+    assert payload["pack"]["recommended_output_shape"]
+    assert payload["pack"]["condensed_context"]
+    assert isinstance(payload["pack"]["do_not_repeat"], list)
 
 
 def test_smart_related_nodes_returns_related_entries() -> None:

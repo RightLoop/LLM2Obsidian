@@ -152,5 +152,8 @@ def test_smart_node_pack_builds_relations_between_related_errors() -> None:
     payload = pack.json()
     assert payload["stored_edges"] >= 1
     assert payload["pack"]["edges"]
+    assert payload["pack"]["recommended_output_shape"]
+    assert payload["pack"]["token_budget_hint"] >= 300
+    assert payload["pack"]["condensed_context"]
     assert "telemetry" in payload
     assert "relation_miner" in payload["telemetry"]
