@@ -33,6 +33,7 @@ from obsidian_agent.services.routing_policy_service import RoutingPolicyService
 from obsidian_agent.services.smart_capture_service import SmartCaptureService
 from obsidian_agent.services.smart_node_pack_service import SmartNodePackService
 from obsidian_agent.services.smart_query_service import SmartQueryService
+from obsidian_agent.services.smart_relink_service import SmartRelinkService
 from obsidian_agent.services.teaching_planner_service import TeachingPlannerService
 from obsidian_agent.services.synthesis_service import SynthesisService
 from obsidian_agent.services.weakness_diagnoser_service import WeaknessDiagnoserService
@@ -65,6 +66,7 @@ class AppContainer:
     smart_capture_service: SmartCaptureService
     smart_node_pack_service: SmartNodePackService
     smart_query_service: SmartQueryService
+    smart_relink_service: SmartRelinkService
     teaching_planner_service: TeachingPlannerService
 
 
@@ -182,6 +184,11 @@ def build_container(settings: Settings | None = None) -> AppContainer:
         context_compressor=ContextCompressorService(routing_policy),
     )
     smart_query_service = SmartQueryService(smart_node_pack_service)
+    smart_relink_service = SmartRelinkService(
+        settings=settings,
+        smart_node_pack_service=smart_node_pack_service,
+        review_service=review_service,
+    )
     teaching_planner_service = TeachingPlannerService(
         smart_node_pack_service=smart_node_pack_service,
         routing_policy=routing_policy,
@@ -204,6 +211,7 @@ def build_container(settings: Settings | None = None) -> AppContainer:
         smart_capture_service=smart_capture_service,
         smart_node_pack_service=smart_node_pack_service,
         smart_query_service=smart_query_service,
+        smart_relink_service=smart_relink_service,
         teaching_planner_service=teaching_planner_service,
     )
 

@@ -84,6 +84,14 @@ To inspect nearby smart nodes without generating a teaching pack:
 curl "http://127.0.0.1:8000/smart/related-nodes?node_key=error/sizeof-vs-strlen&top_k=5"
 ```
 
+To rebuild relations and create a review artifact instead of mutating the note directly:
+
+```bash
+curl -X POST http://127.0.0.1:8000/smart/relink ^
+  -H "Content-Type: application/json" ^
+  -d "{\"node_key\":\"error/sizeof-vs-strlen\",\"top_k\":5,\"create_review\":true,\"dry_run\":false}"
+```
+
 ## 6. Generate and Apply a Review
 
 1. Call `POST /review/generate` with the new Inbox note path.
