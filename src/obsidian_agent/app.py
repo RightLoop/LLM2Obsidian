@@ -32,6 +32,8 @@ from obsidian_agent.services.review_service import ReviewService
 from obsidian_agent.services.routing_policy_service import RoutingPolicyService
 from obsidian_agent.services.smart_capture_service import SmartCaptureService
 from obsidian_agent.services.smart_node_pack_service import SmartNodePackService
+from obsidian_agent.services.smart_query_service import SmartQueryService
+from obsidian_agent.services.teaching_planner_service import TeachingPlannerService
 from obsidian_agent.services.synthesis_service import SynthesisService
 from obsidian_agent.services.weakness_diagnoser_service import WeaknessDiagnoserService
 from obsidian_agent.storage.db import create_session_factory
@@ -62,6 +64,8 @@ class AppContainer:
     link_workflow: LinkWorkflow
     smart_capture_service: SmartCaptureService
     smart_node_pack_service: SmartNodePackService
+    smart_query_service: SmartQueryService
+    teaching_planner_service: TeachingPlannerService
 
 
 def _template_path(name: str) -> Path:
@@ -177,6 +181,11 @@ def build_container(settings: Settings | None = None) -> AppContainer:
         relation_miner=RelationMinerService(routing_policy),
         context_compressor=ContextCompressorService(routing_policy),
     )
+    smart_query_service = SmartQueryService(smart_node_pack_service)
+    teaching_planner_service = TeachingPlannerService(
+        smart_node_pack_service=smart_node_pack_service,
+        routing_policy=routing_policy,
+    )
     return AppContainer(
         settings=settings,
         session_factory=session_factory,
@@ -194,6 +203,8 @@ def build_container(settings: Settings | None = None) -> AppContainer:
         link_workflow=link_workflow,
         smart_capture_service=smart_capture_service,
         smart_node_pack_service=smart_node_pack_service,
+        smart_query_service=smart_query_service,
+        teaching_planner_service=teaching_planner_service,
     )
 
 

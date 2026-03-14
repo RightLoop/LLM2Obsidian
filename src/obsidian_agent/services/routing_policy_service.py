@@ -16,3 +16,10 @@ class RoutingPolicyService:
         if self.local_llm_service and self.local_llm_service.client is not None:
             return self.local_llm_service
         return self.primary_llm_service
+
+    def for_teaching_task(self) -> LLMService:
+        if self.primary_llm_service and self.primary_llm_service.client is not None:
+            return self.primary_llm_service
+        if self.local_llm_service and self.local_llm_service.client is not None:
+            return self.local_llm_service
+        return self.primary_llm_service

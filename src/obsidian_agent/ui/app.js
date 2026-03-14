@@ -62,6 +62,7 @@ const translations = {
     runSmartCapture: "生成 Error Node",
     nodePackPlaceholder: "输入 node_key，例如 error/sizeof-vs-strlen",
     runNodePack: "生成 Node Pack",
+    runTeachPack: "生成 Teaching Pack",
     search: "搜索",
     searchPlaceholder: "搜索笔记",
     runSearch: "执行搜索",
@@ -89,6 +90,7 @@ const translations = {
     searchComplete: "搜索完成",
     smartCaptureComplete: "错题分析完成",
     nodePackComplete: "Node Pack 已生成",
+    teachPackComplete: "Teaching Pack 已生成",
     startupError: "启动错误",
     consoleCleared: "控制台已清空。",
     maintenancePrefix: "维护结果",
@@ -154,6 +156,7 @@ const translations = {
     runSmartCapture: "Create Error Node",
     nodePackPlaceholder: "Enter a node_key such as error/sizeof-vs-strlen",
     runNodePack: "Build Node Pack",
+    runTeachPack: "Build Teaching Pack",
     search: "Search",
     searchPlaceholder: "Search notes",
     runSearch: "Run Search",
@@ -181,6 +184,7 @@ const translations = {
     searchComplete: "Search complete",
     smartCaptureComplete: "Smart error capture complete",
     nodePackComplete: "Node pack generated",
+    teachPackComplete: "Teaching pack generated",
     startupError: "Startup error",
     consoleCleared: "Console cleared.",
     maintenancePrefix: "Maintenance",
@@ -315,16 +319,30 @@ function renderSmartResult(payload) {
   const relations = (((payload.pack || {}).edges) || [])
     .map((item) => `<li>${item.relation_type} -> ${item.to_node_key} (${item.confidence})</li>`)
     .join("");
+  const teachingSections = (payload.sections || [])
+    .map((item) => `<li><strong>${item.heading}</strong>: ${item.body}</li>`)
+    .join("");
+  const drills = (payload.drills || []).map((item) => `<li>${item}</li>`).join("");
   const preview = payload.action_preview
     ? `<small>dry-run: ${payload.action_preview.target_path}</small>`
-    : `<small>${payload.node ? payload.node.note_path || "" : payload.pack.anchor.note_path || ""}</small>`;
+    : `<small>${payload.node ? payload.node.note_path || "" : (payload.pack ? payload.pack.anchor.note_path || "" : "")}</small>`;
+  const title = payload.error ? payload.error.title : (payload.title || (payload.pack ? payload.pack.anchor.title : ""));
+  const summary = payload.error
+    ? payload.error.summary
+    : ((payload.pack && payload.pack.summary) || payload.overview || "");
+  const secondary = payload.error
+    ? payload.error.root_cause
+    : (payload.overview || (payload.pack ? payload.pack.anchor.summary : ""));
+  const listHtml = weaknesses || teachingSections || relations || drills || "<li>-</li>";
+  const markdown = payload.markdown ? `<pre class="console-output">${payload.markdown}</pre>` : "";
   target.innerHTML = `
     <article class="result-card">
-      <strong>${payload.error ? payload.error.title : payload.pack.anchor.title}</strong>
-      <div>${payload.error ? payload.error.summary : payload.pack.summary}</div>
-      <div>${payload.error ? payload.error.root_cause : payload.pack.anchor.summary}</div>
-      <ul>${weaknesses || relations || "<li>-</li>"}</ul>
+      <strong>${title}</strong>
+      <div>${summary}</div>
+      <div>${secondary}</div>
+      <ul>${listHtml}</ul>
       ${preview}
+      ${markdown}
     </article>
   `;
 }
@@ -438,6 +456,18 @@ document.getElementById("nodePackSubmit").addEventListener("click", async () => 
   });
   renderSmartResult(payload);
   logResult(t("nodePackComplete"), payload);
+});
+
+document.getElementById("teachSubmit").addEventListener("click", async () => {
+  const payload = await api("/smart/teach", {
+    method: "POST",
+    body: JSON.stringify({
+      node_key: document.getElementById("nodePackKey").value,
+      top_k: 5,
+    }),
+  });
+  renderSmartResult(payload);
+  logResult(t("teachPackComplete"), payload);
 });
 
 document.getElementById("searchSubmit").addEventListener("click", async () => {

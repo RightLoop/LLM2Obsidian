@@ -231,3 +231,27 @@ class NodePackRequest(BaseModel):
 class SmartNodePackResponse(BaseModel):
     pack: RelationPack
     stored_edges: int = 0
+
+
+class RelatedNodesRequest(BaseModel):
+    node_key: str = Field(min_length=3)
+    top_k: int = Field(default=5, ge=1, le=10)
+
+
+class TeachingPackRequest(BaseModel):
+    node_key: str = Field(min_length=3)
+    top_k: int = Field(default=5, ge=1, le=10)
+
+
+class TeachingSection(BaseModel):
+    heading: str
+    body: str
+
+
+class TeachingPackResponse(BaseModel):
+    pack: RelationPack
+    title: str
+    overview: str
+    sections: list[TeachingSection] = Field(default_factory=list)
+    drills: list[str] = Field(default_factory=list)
+    markdown: str

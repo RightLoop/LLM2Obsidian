@@ -80,6 +80,8 @@ python -m compileall src scripts
 - `POST /maintenance/weekly-digest`
 - `POST /smart/error-capture`
 - `POST /smart/node-pack`
+- `POST /smart/teach`
+- `GET /smart/related-nodes`
 
 ## Delivery Notes
 
@@ -87,7 +89,7 @@ python -m compileall src scripts
 - `DRY_RUN=true` returns action previews for write paths instead of mutating the vault.
 - Prompt assets live under `src/obsidian_agent/prompts/` and are tracked by `manifest.json`.
 - The built-in control panel is served from `/` and `/ui`.
-- The control panel can edit `.env`, reload runtime settings, seed demo data, reindex, capture text, run smart C-error capture, search notes, inspect review items, and run maintenance jobs.
+- The control panel can edit `.env`, reload runtime settings, seed demo data, reindex, capture text, run smart C-error capture, preview node packs, build teaching packs, search notes, inspect review items, and run maintenance jobs.
 - `/capture/url` blocks loopback and private-network targets to reduce SSRF risk.
 
 See [docs/operations.md](/W:/codex/codex/docs/operations.md), [docs/api.md](/W:/codex/codex/docs/api.md), and [docs/prompts.md](/W:/codex/codex/docs/prompts.md) for details.
