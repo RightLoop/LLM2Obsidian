@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
 from obsidian_agent.domain.enums import (
+    KnowledgeNodeType,
+    KnowledgeRelationType,
     NoteKind,
     NoteStatus,
     ProposalType,
@@ -152,3 +155,136 @@ class ActionPreview(BaseModel):
     action: str
     target_path: str
     details: dict[str, object] = Field(default_factory=dict)
+
+
+class ErrorCaptureRequest(BaseModel):
+    title: str | None = None
+    prompt: str = Field(min_length=10)
+    code: str = ""
+    user_analysis: str = ""
+    language: str = "c"
+    source_ref: str = ""
+
+
+class ErrorObject(BaseModel):
+    title: str
+    language: str = "c"
+    error_signature: str
+    summary: str
+    trigger_mistake: str
+    root_cause: str
+    incorrect_assumption: str
+    corrective_rule: str
+    next_time_checklist: list[str] = Field(default_factory=list)
+    evidence: list[str] = Field(default_factory=list)
+    related_concepts: list[str] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)
+    confidence: float = 0.5
+
+
+class WeaknessObject(BaseModel):
+    name: str
+    summary: str
+    gap_type: str
+    recommended_practice: str
+    related_concepts: list[str] = Field(default_factory=list)
+    confidence: float = 0.5
+
+
+class KnowledgeNodeSchema(BaseModel):
+    id: int | None = None
+    node_key: str
+    node_type: KnowledgeNodeType
+    title: str
+    summary: str
+    note_path: str | None = None
+    source_note_path: str | None = None
+    tags: list[str] = Field(default_factory=list)
+    metadata: dict[str, object] = Field(default_factory=dict)
+
+
+class KnowledgeEdgeSchema(BaseModel):
+    id: int | None = None
+    from_node_key: str
+    to_node_key: str
+    relation_type: KnowledgeRelationType
+    reason: str
+    confidence: float = 0.5
+
+
+class RelationPack(BaseModel):
+    anchor: KnowledgeNodeSchema
+    related_nodes: list[KnowledgeNodeSchema] = Field(default_factory=list)
+    edges: list[KnowledgeEdgeSchema] = Field(default_factory=list)
+    summary: str = ""
+    relation_summary: str = ""
+    weakness_labels: list[str] = Field(default_factory=list)
+    do_not_repeat: list[str] = Field(default_factory=list)
+    recommended_output_shape: str = "teaching_note"
+    token_budget_hint: int = 800
+    condensed_context: str = ""
+
+
+class SmartErrorCaptureResponse(BaseModel):
+    error: ErrorObject
+    weaknesses: list[WeaknessObject] = Field(default_factory=list)
+    node: KnowledgeNodeSchema
+    related_nodes: list[KnowledgeNodeSchema] = Field(default_factory=list)
+    action_preview: ActionPreview | None = None
+    stored_edges: int = 0
+    telemetry: dict[str, object] = Field(default_factory=dict)
+
+
+class NodePackRequest(BaseModel):
+    node_key: str = Field(min_length=3)
+    top_k: int = Field(default=5, ge=1, le=10)
+
+
+class SmartNodePackResponse(BaseModel):
+    pack: RelationPack
+    stored_edges: int = 0
+    telemetry: dict[str, object] = Field(default_factory=dict)
+
+
+class RelatedNodesRequest(BaseModel):
+    node_key: str = Field(min_length=3)
+    top_k: int = Field(default=5, ge=1, le=10)
+
+
+class TeachingPackRequest(BaseModel):
+    node_key: str = Field(min_length=3)
+    top_k: int = Field(default=5, ge=1, le=10)
+    delivery_mode: Literal["auto", "local", "remote"] = "auto"
+
+
+class TeachingSection(BaseModel):
+    heading: str
+    body: str
+
+
+class TeachingPackResponse(BaseModel):
+    pack: RelationPack
+    title: str
+    overview: str
+    sections: list[TeachingSection] = Field(default_factory=list)
+    drills: list[str] = Field(default_factory=list)
+    markdown: str
+    delivery_mode: str = "auto"
+    telemetry: dict[str, object] = Field(default_factory=dict)
+
+
+class SmartRelinkRequest(BaseModel):
+    node_key: str = Field(min_length=3)
+    top_k: int = Field(default=5, ge=1, le=10)
+    create_review: bool = True
+    dry_run: bool = True
+
+
+class SmartRelinkResponse(BaseModel):
+    pack: RelationPack
+    related_section_markdown: str
+    stored_edges: int = 0
+    review_id: int | None = None
+    proposal_path: str | None = None
+    action_preview: ActionPreview | None = None
+    telemetry: dict[str, object] = Field(default_factory=dict)

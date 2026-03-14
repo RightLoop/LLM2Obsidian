@@ -18,7 +18,7 @@
 - `hotfix/v0.2.1-doorbell-dup-fix`
 
 ## 3. 开发流程
-1. 在 GitHub issue 中明确需求和验收标准。（注意你要在远端提交正式的issue并基于此开branch）
+1. 在 GitHub issue 中明确需求和验收标准。
 2. 从 `develop` 切 `feature/*` 分支。
 3. 本地开发 + 单元测试 + 必要压测。
 4. 提交 PR 到 `develop`，完成评审后合并。

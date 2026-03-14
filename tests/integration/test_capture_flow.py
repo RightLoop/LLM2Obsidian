@@ -2,19 +2,18 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from obsidian_agent.app import build_container, create_app
+from obsidian_agent.app import create_app
 from obsidian_agent.config import Settings
 
 
 def test_capture_text_creates_inbox_note(tmp_path: Path) -> None:
     settings = Settings(
+        _env_file=None,
         vault_root=tmp_path / "vault",
         sqlite_path=tmp_path / "db.sqlite3",
         vector_store_path=tmp_path / "vectors.json",
     )
-    app = create_app()
-    app.state.container = build_container(settings)
-    client = TestClient(app)
+    client = TestClient(create_app(settings))
     response = client.post(
         "/capture/text",
         json={"title": "Test", "text": "Alpha beta gamma delta epsilon zeta"},

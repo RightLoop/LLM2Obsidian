@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from obsidian_agent.config import Settings
@@ -20,6 +21,8 @@ class ObsidianService:
         self.settings.vault_root.mkdir(parents=True, exist_ok=True)
         self.settings.inbox_folder_path.mkdir(parents=True, exist_ok=True)
         self.settings.review_folder_path.mkdir(parents=True, exist_ok=True)
+        self.settings.smart_nodes_folder_path.mkdir(parents=True, exist_ok=True)
+        self.settings.smart_errors_folder_path.mkdir(parents=True, exist_ok=True)
 
     def _path(self, vault_path: str) -> Path:
         return self.settings.vault_root / vault_path
@@ -194,7 +197,7 @@ class ObsidianService:
 
     def _build_filename(self, folder: str, title: str) -> str:
         timestamp = now_utc()
-        safe_title = " ".join(title.replace("/", " ").replace("\\", " ").split()).strip() or "Untitled"
+        safe_title = self._sanitize_filename_stem(title)
         if folder == self.settings.inbox_folder:
             return f"{timestamp.strftime('%Y-%m-%d %H%M')} - {safe_title}.md"
         if folder == self.settings.review_folder:
@@ -202,3 +205,9 @@ class ObsidianService:
         if safe_title.lower().startswith("weekly digest"):
             return f"{safe_title}.md"
         return f"{safe_title}.md"
+
+    def _sanitize_filename_stem(self, title: str) -> str:
+        safe_title = " ".join(title.replace("/", " ").replace("\\", " ").split()).strip()
+        safe_title = re.sub(r'[<>:"|?*]', " ", safe_title)
+        safe_title = re.sub(r"\s+", " ", safe_title).strip(" .")
+        return safe_title or "Untitled"

@@ -46,4 +46,17 @@ class OpenAIResponsesClient:
             )
         data = response.json()
         output_text = data["output"][0]["content"][0]["text"]
-        return json.loads(output_text)
+        payload = json.loads(output_text)
+        usage = data.get("usage", {})
+        payload["_telemetry"] = {
+            "provider": "openai",
+            "model": data.get("model", self.model),
+            "prompt_chars": len(instructions) + len(input_text),
+            "response_chars": len(output_text),
+            "usage": {
+                "prompt_tokens": usage.get("input_tokens"),
+                "completion_tokens": usage.get("output_tokens"),
+                "total_tokens": usage.get("total_tokens"),
+            },
+        }
+        return payload
