@@ -47,6 +47,7 @@ class SmartRelinkService:
                 related_section_markdown=related_section_markdown,
                 stored_edges=pack_response.stored_edges,
                 action_preview=preview,
+                telemetry=pack_response.telemetry,
             )
 
         proposal = ReviewProposal(
@@ -66,6 +67,7 @@ class SmartRelinkService:
             stored_edges=pack_response.stored_edges,
             review_id=review_id,
             proposal_path=proposal_path,
+            telemetry=pack_response.telemetry,
         )
 
     def _render_related_section(self, pack) -> str:

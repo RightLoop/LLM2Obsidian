@@ -347,6 +347,9 @@ function renderSmartResult(payload) {
     ? `<small>review #${payload.review_id}: ${payload.proposal_path || ""}</small>`
     : "";
   const edgeMeta = payload.stored_edges ? `<small>stored edges: ${payload.stored_edges}</small>` : "";
+  const telemetryMeta = payload.telemetry && Object.keys(payload.telemetry).length
+    ? `<small>telemetry: ${JSON.stringify(payload.telemetry)}</small>`
+    : "";
   target.innerHTML = `
     <article class="result-card">
       <strong>${title}</strong>
@@ -355,6 +358,7 @@ function renderSmartResult(payload) {
       <ul>${listHtml}</ul>
       ${preview}
       ${edgeMeta}
+      ${telemetryMeta}
       ${reviewMeta}
       ${markdown}
     </article>

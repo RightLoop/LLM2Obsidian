@@ -44,4 +44,16 @@ class OllamaChatClient:
             )
         data = response.json()
         message_text = data["message"]["content"]
-        return json.loads(message_text)
+        payload = json.loads(message_text)
+        payload["_telemetry"] = {
+            "provider": "ollama",
+            "model": data.get("model", self.model),
+            "prompt_chars": len(instructions) + len(input_text),
+            "response_chars": len(message_text),
+            "usage": {
+                "prompt_tokens": data.get("prompt_eval_count"),
+                "completion_tokens": data.get("eval_count"),
+                "total_tokens": (data.get("prompt_eval_count") or 0) + (data.get("eval_count") or 0),
+            },
+        }
+        return payload

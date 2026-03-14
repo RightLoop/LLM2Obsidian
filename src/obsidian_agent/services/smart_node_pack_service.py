@@ -62,7 +62,16 @@ class SmartNodePackService:
                     if item.id is not None
                 },
             )
-        return SmartNodePackResponse(pack=pack, stored_edges=len(stored))
+        return SmartNodePackResponse(
+            pack=pack,
+            stored_edges=len(stored),
+            telemetry={
+                "relation_miner": self.relation_miner.last_telemetry,
+                "context_compressor": self.context_compressor.last_telemetry,
+                "candidate_count": len(candidates),
+                "related_count": len(related_nodes),
+            },
+        )
 
     def _to_schema(self, entity) -> KnowledgeNodeSchema:
         tags = json.loads(entity.tags_json or "[]")

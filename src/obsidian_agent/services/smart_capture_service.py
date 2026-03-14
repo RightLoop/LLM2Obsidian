@@ -36,4 +36,9 @@ class SmartCaptureService:
             related_nodes=related_nodes,
             action_preview=action_preview,
             stored_edges=stored_edges,
+            telemetry={
+                "error_extractor": self.error_extractor.last_telemetry,
+                "weakness_count": len(weaknesses),
+                "related_node_count": len(related_nodes),
+            },
         )

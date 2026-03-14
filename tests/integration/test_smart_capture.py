@@ -39,6 +39,8 @@ def test_smart_error_capture_creates_supporting_nodes_and_edges() -> None:
     assert payload["related_nodes"]
     assert payload["stored_edges"] >= 2
     assert any(item["node_type"] == "contrast" for item in payload["related_nodes"])
+    assert "telemetry" in payload
+    assert "error_extractor" in payload["telemetry"]
 
     error_note_path = payload["node"]["note_path"]
     assert error_note_path.startswith("21 Errors/")
@@ -150,3 +152,5 @@ def test_smart_node_pack_builds_relations_between_related_errors() -> None:
     payload = pack.json()
     assert payload["stored_edges"] >= 1
     assert payload["pack"]["edges"]
+    assert "telemetry" in payload
+    assert "relation_miner" in payload["telemetry"]

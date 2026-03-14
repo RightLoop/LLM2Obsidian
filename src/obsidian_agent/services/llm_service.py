@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 from typing import Protocol
 
 from obsidian_agent.domain.enums import ProposalType, SourceType
@@ -26,13 +27,41 @@ class LLMService:
 
     def __init__(self, client: JsonLLMClient | None = None) -> None:
         self.client = client
+        self._last_telemetry: dict[str, object] = {}
 
     async def run_structured_task(self, instructions: str, input_text: str) -> dict[str, object] | None:
         """Execute a structured generation task when a provider is available."""
 
         if not self.client:
+            self._last_telemetry = {
+                "provider": "offline",
+                "model": "offline-fallback",
+                "prompt_chars": len(instructions) + len(input_text),
+                "response_chars": 0,
+            }
             return None
-        return await self.client.create_json_response(instructions=instructions, input_text=input_text)
+        raw = await self.client.create_json_response(instructions=instructions, input_text=input_text)
+        if not isinstance(raw, dict):
+            self._last_telemetry = {}
+            return raw
+        telemetry = raw.pop("_telemetry", {})
+        if isinstance(telemetry, dict):
+            self._last_telemetry = telemetry
+        else:
+            self._last_telemetry = {}
+        return raw
+
+    def pop_telemetry(self) -> dict[str, object]:
+        telemetry = copy.deepcopy(self._last_telemetry)
+        self._last_telemetry = {}
+        return telemetry
+
+    def describe(self) -> dict[str, object]:
+        if not self.client:
+            return {"provider": "offline", "model": "offline-fallback"}
+        provider = self.client.__class__.__name__.replace("ChatClient", "").replace("ResponsesClient", "")
+        model = getattr(self.client, "model", "unknown")
+        return {"provider": provider.lower(), "model": model}
 
     async def normalize_capture(self, payload: CaptureInput) -> NormalizedCapture:
         """Return a structured capture payload."""
