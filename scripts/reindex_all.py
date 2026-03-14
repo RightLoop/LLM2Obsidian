@@ -1,4 +1,4 @@
-"""Compatibility entrypoint."""
+"""CLI helper for reindexing."""
 
 from obsidian_agent.cli import main
 
