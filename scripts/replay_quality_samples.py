@@ -172,19 +172,37 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--write-vault", action="store_true", help="Allow the replay to write into the active vault.")
+    parser.add_argument(
+        "--use-live-store",
+        action="store_true",
+        help="Reuse the configured sqlite/vector/vault paths instead of an isolated replay workspace.",
+    )
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
     settings = get_settings()
-    settings = settings.model_copy(update={"dry_run": not args.write_vault})
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    if args.use_live_store:
+        settings = settings.model_copy(update={"dry_run": not args.write_vault})
+    else:
+        replay_root = Path("data/test_runs") / f"quality_replay_{timestamp}"
+        settings = settings.model_copy(
+            update={
+                "dry_run": False,
+                "obsidian_mode": "filesystem",
+                "vault_root": replay_root / "vault",
+                "sqlite_path": replay_root / "replay.sqlite3",
+                "vector_store_path": replay_root / "replay-vectors.json",
+            }
+        )
     samples = load_samples(args.fixtures)
     results = asyncio.run(replay_samples(settings, samples, args.limit))
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    json_path = args.output_dir / f"{timestamp}-quality-replay.json"
-    md_path = args.output_dir / f"{timestamp}-quality-replay.md"
+    provider_slug = settings.llm_provider.replace("/", "-").replace(" ", "-")
+    json_path = args.output_dir / f"{timestamp}-{provider_slug}-quality-replay.json"
+    md_path = args.output_dir / f"{timestamp}-{provider_slug}-quality-replay.md"
     json_path.write_text(json.dumps(results, indent=2, ensure_ascii=False), encoding="utf-8")
     md_path.write_text(build_markdown_report(results, settings, args.fixtures), encoding="utf-8")
     print(f"Wrote {json_path}")

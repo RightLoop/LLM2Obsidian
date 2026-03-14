@@ -204,8 +204,8 @@ class NodeWriterService:
             merged_tags = sorted({*(reused.tags if reused else []), *spec.tags})
             merged_metadata = dict(reused.metadata if reused else {})
             merged_metadata.update(spec.metadata)
-            summary = reused.summary if reused and len(reused.summary) >= len(spec.summary) else spec.summary
-            title = reused.title if reused else spec.title
+            summary = self._preferred_support_summary(reused.summary, spec.summary) if reused else spec.summary
+            title = self._preferred_support_title(reused.title, spec.title, spec.node_type) if reused else spec.title
             node_key = reused.node_key if reused else spec.node_key
 
             if not note_path:
@@ -358,7 +358,6 @@ class NodeWriterService:
         if direct is not None:
             return direct
         normalized_title = self._normalize_text(candidate.title)
-        normalized_summary = self._normalize_text(candidate.summary)
         with self.session_factory() as session:
             repo = KnowledgeNodeRepository(session)
             for entity in repo.list_all():
@@ -366,8 +365,6 @@ class NodeWriterService:
                     continue
                 existing = self._entity_to_schema(entity)
                 if self._normalize_text(existing.title) == normalized_title:
-                    return existing
-                if normalized_summary and self._normalize_text(existing.summary) == normalized_summary:
                     return existing
         return None
 
@@ -451,12 +448,27 @@ class NodeWriterService:
             "array-decay": "数组退化",
             "char-pointer": "char* 指针",
             "char-array": "char[] 数组",
+            "string-literal": "字符串字面量",
             "function-parameter": "函数形参与退化",
             "address-of-array": "整个数组对象的地址",
             "null-terminator": "字符串结尾空字符",
+            "memory-allocation": "内存分配容量",
             "memory-alignment": "内存对齐",
             "struct-padding": "结构体填充",
             "pointer-lifetime": "指针生命周期",
+            "pointer-arithmetic": "指针偏移边界",
+            "array-boundary": "数组边界",
+            "buffer-capacity": "缓冲区容量",
+            "dangling-pointer": "悬空指针",
+            "stack-memory": "栈上对象生命周期",
+            "heap-memory": "堆内存生命周期",
+            "use-after-free": "释放后继续使用",
+            "dynamic-array": "动态数组容量",
+            "multi-dimensional-array": "多维数组退化",
+            "pointer-level": "指针层级",
+            "struct-layout": "结构体布局",
+            "cstring": "C 字符串约束",
+            "memcpy": "memcpy 拷贝边界",
         }
         return mapping.get(concept, concept.replace("-", " "))
 
@@ -472,12 +484,17 @@ class NodeWriterService:
             "array-decay": "数组在大多数表达式里会退化成首元素指针，但并不是所有语境都发生退化。",
             "char-pointer": "char* 表示一个保存字符地址的指针变量，不代表它拥有对应字符存储。",
             "char-array": "char[] 是真正存放字符的数组对象，容量和内容都属于对象本体。",
+            "string-literal": "字符串字面量通常位于只读存储区域，不能因为被 char* 指向就默认可写。",
             "function-parameter": "数组作为函数形参时会按指针语义处理，调用点的数组长度不会自动保留。",
             "address-of-array": "&arr 指向整个数组对象，类型层级与 arr 退化后的首元素指针不同。",
             "null-terminator": "合法的 C 字符串必须以 \\0 结尾；终止符既影响遍历，也影响容量判断。",
+            "memory-allocation": "字符串相关内存分配必须同时考虑可见字符、终止符和目标缓冲区容量。",
             "memory-alignment": "内存对齐要求会改变对象在内存中的起始位置和整体大小。",
             "struct-padding": "结构体为了满足成员和整体对齐，可能插入 padding 字节。",
             "pointer-lifetime": "地址值存在不代表对象仍然有效，指针是否可用取决于被指对象的生命周期。",
+            "pointer-arithmetic": "指针偏移的结果必须同时满足类型正确和边界合法，尾后一位不能解引用。",
+            "array-boundary": "数组最后一个有效元素和尾后一位是两个不同的边界概念。",
+            "buffer-capacity": "缓冲区容量讨论的是最多能安全写入多少字节，不等于当前已有内容长度。",
         }
         return mapping.get(concept, f"这个概念是理解“{error.title}”时必须先分清的判断边界。")
 
@@ -490,12 +507,16 @@ class NodeWriterService:
             "array-decay": "每次看到数组参与表达式，都先问一句：这里有没有发生退化？",
             "char-pointer": "char* 默认只说明“保存了字符地址”，不说明那段字符一定可写。",
             "char-array": "char[] 默认说明“对象自己拥有存储空间”，容量必须单独核对。",
+            "string-literal": "看到字符串字面量时，先把它当作只读字符序列，而不是可随意原地修改的数组。",
             "function-parameter": "数组进入函数后按指针处理，需要长度就显式传入，不靠 sizeof 猜。",
             "address-of-array": "看到 &arr 时先写类型，再判断它是“整个数组对象地址”，不是首元素地址。",
             "null-terminator": "只要题目涉及 C 字符串，就把 \\0 当成真实占位字节一起考虑。",
+            "memory-allocation": "做容量分配时始终把“可见字符 + 终止符 + 目标缓冲区约束”一起算。",
             "memory-alignment": "估算内存大小前，先列出每个对象的对齐要求。",
             "struct-padding": "算结构体大小时不要直接相加成员 sizeof，先按布局顺序推 padding。",
             "pointer-lifetime": "保留地址之前先确认对象在后续使用点前不会结束生命周期。",
+            "pointer-arithmetic": "偏移后先判断它是不是仍处在合法可解引用区间，再使用结果。",
+            "array-boundary": "遇到索引和偏移时，先把最后一个有效位置和尾后一位分开标出来。",
         }
         return mapping.get(concept, error.corrective_rule)
 
@@ -508,12 +529,16 @@ class NodeWriterService:
             "array-decay": "要和“数组对象本体仍然存在”这件事区分开。",
             "char-pointer": "要和 char[] 数组、字符串字面量可写性区分开。",
             "char-array": "要和 char* 指针变量、字面量地址区分开。",
+            "string-literal": "要和可写数组对象、动态分配缓冲区区分开。",
             "function-parameter": "要和调用点处真实数组对象及其长度信息区分开。",
             "address-of-array": "要和首元素地址、一级指针类型区分开。",
             "null-terminator": "要和可见字符、缓冲区容量、拷贝字节数区分开。",
+            "memory-allocation": "要和逻辑长度、对象大小、当前已写内容区分开。",
             "memory-alignment": "要和成员表面大小直接相加的直觉区分开。",
             "struct-padding": "要和“成员之间没有空洞”的假设区分开。",
             "pointer-lifetime": "要和“地址值还在”这种表面现象区分开。",
+            "pointer-arithmetic": "要和普通整数加减、数组索引直觉区分开。",
+            "array-boundary": "要和尾后一位、可比较位置、可解引用位置区分开。",
         }
         return mapping.get(concept, error.root_cause)
 
@@ -526,12 +551,16 @@ class NodeWriterService:
             "array-decay": "判断数组进表达式、函数参数和指针运算时是否按指针语义处理时使用。",
             "char-pointer": "判断地址来源、可写性和是否拥有存储空间时使用。",
             "char-array": "判断容量、终止符空间和原地修改时使用。",
+            "string-literal": "判断字符序列是否可写、是否位于只读区以及能否原地修改时使用。",
             "function-parameter": "分析函数内部的 sizeof、长度判断和形参语义时使用。",
             "address-of-array": "分析多维数组、数组整体地址和指针类型时使用。",
             "null-terminator": "分析字符串拷贝、拼接、遍历和容量分配时使用。",
+            "memory-allocation": "分析 malloc、calloc、缓冲区大小和字符串拷贝前的容量判断时使用。",
             "memory-alignment": "分析 ABI、结构体大小和性能布局时使用。",
             "struct-padding": "分析结构体 sizeof、二进制布局和字段顺序影响时使用。",
             "pointer-lifetime": "分析返回地址、free 之后访问和悬空引用时使用。",
+            "pointer-arithmetic": "分析 p + n、尾后一位和偏移后解引用是否合法时使用。",
+            "array-boundary": "分析数组末尾、循环边界和偏移落点是否合法时使用。",
         }
         return mapping.get(concept, f"在处理“{error.title}”这一类题目时使用。")
 
@@ -542,11 +571,44 @@ class NodeWriterService:
         return "做题时先把两边概念各自的类型、对象层级或长度定义写出来，再判断结论。"
 
     def _normalize_text(self, text: str) -> str:
-        lowered = text.lower()
+        lowered = text.lower().strip()
+        lowered = lowered.replace("&arr", "address-of-array")
+        lowered = lowered.replace("char[]", "char-array")
+        lowered = lowered.replace("char *", "char-pointer")
+        lowered = lowered.replace("char*", "char-pointer")
         lowered = lowered.replace("&", " and ")
-        lowered = re.sub(r"[^a-z0-9]+", " ", lowered)
+        lowered = re.sub(r"[^\w\u4e00-\u9fff]+", " ", lowered)
         tokens = [token for token in lowered.split() if token not in {"the", "a", "an", "in", "of"}]
         return " ".join(tokens)
+
+    def _preferred_support_title(
+        self,
+        existing_title: str,
+        candidate_title: str,
+        node_type: KnowledgeNodeType,
+    ) -> str:
+        title = (existing_title or "").strip()
+        if not title:
+            return candidate_title
+        legacy_prefixes = ("Pitfall:", "Contrast:", "Weakness:")
+        if title.startswith(legacy_prefixes):
+            return candidate_title
+        if node_type == KnowledgeNodeType.CONCEPT and title.isascii() and len(title.split()) <= 2:
+            return candidate_title
+        return title
+
+    def _preferred_support_summary(self, existing_summary: str, candidate_summary: str) -> str:
+        summary = (existing_summary or "").strip()
+        if not summary:
+            return candidate_summary
+        low_quality_markers = (
+            "The learner repeatedly confuses",
+            "Fallback relation inferred",
+            "Related concept",
+        )
+        if any(marker in summary for marker in low_quality_markers):
+            return candidate_summary
+        return summary
 
     def _node_type_label(self, node_type: KnowledgeNodeType) -> str:
         mapping = {
