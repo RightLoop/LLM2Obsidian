@@ -70,6 +70,8 @@ class SmartNodePackService:
                 "context_compressor": self.context_compressor.last_telemetry,
                 "candidate_count": len(candidates),
                 "related_count": len(related_nodes),
+                "token_budget_hint": pack.token_budget_hint,
+                "condensed_context_chars": len(pack.condensed_context),
             },
         )
 

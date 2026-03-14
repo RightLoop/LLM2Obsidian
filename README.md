@@ -93,6 +93,7 @@ python -m compileall src scripts
 - The control panel can edit `.env`, reload runtime settings, seed demo data, reindex, capture text, run smart C-error capture, preview node packs, build teaching packs, create relink reviews, search notes, inspect review items, and run maintenance jobs.
 - Smart error capture creates deduplicated support nodes for `concept`, `pitfall`, and `contrast` when the input suggests them.
 - Smart responses now include compact telemetry for provider routing, prompt size, response size, and token usage when the provider exposes usage data.
+- Teaching packs now accept `delivery_mode=auto|local|remote` and expose the resolved route, token budget hint, and condensed context size in telemetry.
 - `/capture/url` blocks loopback and private-network targets to reduce SSRF risk.
 
 See [docs/operations.md](/W:/codex/codex/docs/operations.md), [docs/api.md](/W:/codex/codex/docs/api.md), and [docs/prompts.md](/W:/codex/codex/docs/prompts.md) for details.

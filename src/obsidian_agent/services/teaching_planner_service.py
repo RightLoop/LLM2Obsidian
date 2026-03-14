@@ -34,9 +34,11 @@ class TeachingPlannerService:
             top_k=request.top_k,
         )
         pack = pack_response.pack
-        payload = await self._plan_from_model(pack)
+        payload, resolved_mode = await self._plan_from_model(pack, request.delivery_mode)
         if payload is None:
             payload = self._fallback_plan(pack)
+            if resolved_mode == "offline":
+                resolved_mode = "offline-fallback"
         markdown = self._render_markdown(
             title=payload["title"],
             overview=payload["overview"],
@@ -50,33 +52,44 @@ class TeachingPlannerService:
             sections=payload["sections"],
             drills=payload["drills"],
             markdown=markdown,
+            delivery_mode=resolved_mode,
             telemetry={
+                "delivery_mode_requested": request.delivery_mode,
+                "delivery_mode_resolved": resolved_mode,
+                "pack_token_budget_hint": pack.token_budget_hint,
+                "pack_context_chars": len(pack.condensed_context),
                 "planner": self.last_telemetry,
                 "pack": pack_response.telemetry,
             },
         )
 
-    async def _plan_from_model(self, pack: RelationPack) -> dict[str, object] | None:
-        llm_service = self.routing_policy.for_teaching_task("teaching_planner")
+    async def _plan_from_model(
+        self,
+        pack: RelationPack,
+        delivery_mode: str,
+    ) -> tuple[dict[str, object] | None, str]:
+        llm_service, resolved_mode = self.routing_policy.for_teaching_task(
+            "teaching_planner",
+            delivery_mode=delivery_mode,
+        )
         raw = await llm_service.run_structured_task(
             instructions=(
                 "Return JSON with keys: title, overview, sections, drills. "
                 "sections must be a list of objects with heading and body. "
                 "drills must be a list of short practice prompts. "
-                "Focus on teaching the anchor concept using the related nodes and relations."
+                "Focus on teaching the anchor concept using the condensed relation pack. "
+                f"Stay within roughly {pack.token_budget_hint} tokens of useful teaching content. "
+                f"Preferred output shape: {pack.recommended_output_shape}. "
+                f"Avoid repetition using these constraints: {'; '.join(pack.do_not_repeat) or 'none'}."
             ),
             input_text="\n".join(
                 [
                     f"Anchor: {pack.anchor.title}",
                     f"Anchor summary: {pack.anchor.summary}",
                     f"Relation summary: {pack.summary}",
-                    "Related nodes:",
-                    *[f"- {node.title}: {node.summary}" for node in pack.related_nodes],
-                    "Edges:",
-                    *[
-                        f"- {edge.relation_type.value} -> {edge.to_node_key}: {edge.reason}"
-                        for edge in pack.edges
-                    ],
+                    f"Condensed context: {pack.condensed_context}",
+                    f"Weakness labels: {', '.join(pack.weakness_labels) or 'none'}",
+                    f"Do not repeat: {'; '.join(pack.do_not_repeat) or 'none'}",
                 ]
             ),
         )
@@ -84,7 +97,7 @@ class TeachingPlannerService:
         if self.last_telemetry:
             logger.info("smart_telemetry task=teaching_planner telemetry=%s", self.last_telemetry)
         if not isinstance(raw, dict):
-            return None
+            return None, resolved_mode
         title = str(raw.get("title") or "").strip()
         overview = str(raw.get("overview") or "").strip()
         sections_raw = raw.get("sections")
@@ -102,13 +115,16 @@ class TeachingPlannerService:
         if isinstance(drills_raw, list):
             drills = [str(item).strip() for item in drills_raw if str(item).strip()]
         if not title or not overview or not sections:
-            return None
-        return {
-            "title": title,
-            "overview": overview,
-            "sections": sections,
-            "drills": drills[:5],
-        }
+            return None, resolved_mode
+        return (
+            {
+                "title": title,
+                "overview": overview,
+                "sections": sections,
+                "drills": drills[:5],
+            },
+            resolved_mode,
+        )
 
     def _fallback_plan(self, pack: RelationPack) -> dict[str, object]:
         related_titles = ", ".join(node.title for node in pack.related_nodes[:3]) or "nearby concepts"
@@ -126,16 +142,23 @@ class TeachingPlannerService:
             sections.append(
                 TeachingSection(
                     heading="Common Failure Mode",
-                    body=pack.edges[0].reason,
+                    body=str(pack.anchor.metadata.get("incorrect_assumption") or pack.edges[0].reason),
                 )
             )
         drills = [
             f"Explain {pack.anchor.title} in your own words.",
             f"Write one C example that avoids the mistake behind {pack.anchor.title}.",
         ]
+        if pack.weakness_labels:
+            sections.append(
+                TeachingSection(
+                    heading="Weakness Focus",
+                    body=", ".join(pack.weakness_labels),
+                )
+            )
         return {
             "title": f"Teaching Pack: {pack.anchor.title}",
-            "overview": pack.summary or pack.anchor.summary,
+            "overview": pack.relation_summary or pack.summary or pack.anchor.summary,
             "sections": sections,
             "drills": drills,
         }
