@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>LLM2Obsidian 控制台</title>
+    <link rel="stylesheet" href="/ui/assets/styles.css">
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">LLM2Obsidian</p>
+          <div class="hero-topline">
+            <h1 data-i18n="heroTitle">控制台</h1>
+            <label class="language-switcher">
+              <span data-i18n="languageLabel">语言</span>
+              <select id="languageSelect" aria-label="Language">
+                <option value="zh-CN">简体中文</option>
+                <option value="en">English</option>
+              </select>
+            </label>
+          </div>
+          <p class="lede" data-i18n="heroLede">
+            配置模型和 Obsidian 连接，并在浏览器里直接运行核心工作流。
+          </p>
+          <div class="token-row">
+            <input
+              id="adminToken"
+              type="password"
+              data-i18n-placeholder="adminTokenPlaceholder"
+              placeholder="输入 UI 管理 Token"
+            >
+            <button id="saveAdminToken" class="secondary-button" data-i18n="saveAdminToken">
+              保存 Token
+            </button>
+          </div>
+        </div>
+        <div class="status-card">
+          <span id="healthBadge" class="badge" data-i18n="healthChecking">检查中</span>
+          <p id="envPath" class="env-path" data-i18n="envLoading">正在加载运行时信息...</p>
+          <button id="reloadRuntime" class="secondary-button" data-i18n="reloadRuntime">
+            重新加载运行时
+          </button>
+        </div>
+      </header>
+
+      <main class="dashboard-grid">
+        <section class="panel panel-wide">
+          <div class="panel-head">
+            <h2 data-i18n="runtimeConfig">运行配置</h2>
+            <button id="saveConfig" class="primary-button" data-i18n="saveConfig">保存配置</button>
+          </div>
+          <form id="configForm" class="config-grid">
+            <label><span data-i18n="uiAdminToken">UI 管理 Token</span><input name="ui_admin_token" type="password"></label>
+            <label><span data-i18n="llmProvider">LLM 提供方</span><input name="llm_provider" value="deepseek"></label>
+            <label><span data-i18n="embeddingsProvider">Embedding 提供方</span><input name="embeddings_provider" value="deterministic"></label>
+            <label><span data-i18n="obsidianMode">Obsidian 模式</span><input name="obsidian_mode" value="auto"></label>
+            <label><span data-i18n="vaultRoot">Vault 根目录</span><input name="vault_root"></label>
+            <label><span data-i18n="sqlitePath">SQLite 路径</span><input name="sqlite_path"></label>
+            <label><span data-i18n="vectorStorePath">向量存储路径</span><input name="vector_store_path"></label>
+            <label><span data-i18n="obsidianApiUrl">Obsidian API URL</span><input name="obsidian_api_url"></label>
+            <label><span data-i18n="obsidianApiKey">Obsidian API Key</span><input name="obsidian_api_key" type="password"></label>
+            <label><span data-i18n="deepseekApiKey">DeepSeek API Key</span><input name="deepseek_api_key" type="password"></label>
+            <label><span data-i18n="deepseekBaseUrl">DeepSeek Base URL</span><input name="deepseek_base_url"></label>
+            <label><span data-i18n="deepseekModel">DeepSeek 模型</span><input name="deepseek_model"></label>
+            <label><span data-i18n="openaiApiKey">OpenAI API Key</span><input name="openai_api_key" type="password"></label>
+            <label><span data-i18n="openaiBaseUrl">OpenAI Base URL</span><input name="openai_base_url"></label>
+            <label><span data-i18n="openaiModel">OpenAI 模型</span><input name="openai_model"></label>
+            <label><span data-i18n="ollamaBaseUrl">Ollama Base URL</span><input name="ollama_base_url"></label>
+            <label><span data-i18n="ollamaChatModel">Ollama Chat 模型</span><input name="ollama_chat_model"></label>
+            <label><span data-i18n="ollamaJsonModel">Ollama JSON 模型</span><input name="ollama_json_model"></label>
+            <label><span data-i18n="ollamaEmbeddingModel">Ollama Embedding 模型</span><input name="ollama_embedding_model"></label>
+            <label><span data-i18n="ollamaTimeout">Ollama 超时</span><input name="ollama_timeout_seconds" type="number" step="1"></label>
+            <label><span data-i18n="logLevel">日志级别</span><input name="log_level"></label>
+            <label><span data-i18n="reviewFolder">Review 目录</span><input name="review_folder"></label>
+            <label><span data-i18n="inboxFolder">Inbox 目录</span><input name="inbox_folder"></label>
+            <label><span data-i18n="smartNodesFolder">Smart Nodes 目录</span><input name="smart_nodes_folder"></label>
+            <label><span data-i18n="smartErrorsFolder">Error Nodes 目录</span><input name="smart_errors_folder"></label>
+            <label><span data-i18n="httpTimeout">HTTP 超时</span><input name="http_timeout_seconds" type="number" step="0.5"></label>
+            <label><span data-i18n="retryAttempts">重试次数</span><input name="http_retry_attempts" type="number" step="1"></label>
+            <label><span data-i18n="retryBackoff">重试退避</span><input name="http_retry_backoff_seconds" type="number" step="0.1"></label>
+            <label class="toggle"><span data-i18n="verifySsl">校验 SSL</span><input name="obsidian_verify_ssl" type="checkbox"></label>
+            <label class="toggle"><span data-i18n="dryRun">Dry Run 预演</span><input name="dry_run" type="checkbox"></label>
+          </form>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2 data-i18n="quickActions">快捷操作</h2>
+          </div>
+          <div class="stack">
+            <button id="seedDemo" class="primary-button" data-i18n="seedDemo">生成示例知识库</button>
+            <button id="reindex" class="primary-button" data-i18n="reindex">重建索引</button>
+            <div class="inline-form">
+              <input id="weekKey" value="2026-W11" aria-label="Week key">
+              <button id="runDigest" class="secondary-button" data-i18n="weeklyDigest">生成周报</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2 data-i18n="captureText">文本采集</h2>
+          </div>
+          <div class="stack">
+            <input id="captureTitle" data-i18n-placeholder="captureTitlePlaceholder" placeholder="标题">
+            <textarea id="captureText" rows="8" data-i18n-placeholder="captureTextPlaceholder" placeholder="粘贴一段笔记、文章摘录或想法..."></textarea>
+            <button id="captureSubmit" class="primary-button" data-i18n="captureToInbox">采集到 Inbox</button>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2 data-i18n="smartErrorCapture">错题智能分析</h2>
+          </div>
+          <div class="stack">
+            <input id="smartTitle" data-i18n-placeholder="smartTitlePlaceholder" placeholder="例如：把 sizeof 当成 strlen">
+            <textarea id="smartPrompt" rows="5" data-i18n-placeholder="smartPromptPlaceholder" placeholder="描述题目、错误结论和正确答案。"></textarea>
+            <textarea id="smartCode" rows="6" data-i18n-placeholder="smartCodePlaceholder" placeholder="贴上相关 C 代码。"></textarea>
+            <textarea id="smartAnalysis" rows="4" data-i18n-placeholder="smartAnalysisPlaceholder" placeholder="写下你当时的思路。"></textarea>
+            <button id="smartCaptureSubmit" class="primary-button" data-i18n="runSmartCapture">生成 Error Node</button>
+            <div class="inline-form">
+              <input id="nodePackKey" data-i18n-placeholder="nodePackPlaceholder" placeholder="输入 node_key，例如 error/sizeof-vs-strlen">
+              <button id="nodePackSubmit" class="secondary-button" data-i18n="runNodePack">生成 Node Pack</button>
+            </div>
+            <div class="inline-form">
+              <select id="teachMode" aria-label="Teaching mode">
+                <option value="auto" data-i18n="teachingModeAuto">自动</option>
+                <option value="local" data-i18n="teachingModeLocal">本地</option>
+                <option value="remote" data-i18n="teachingModeRemote">远端</option>
+              </select>
+              <button id="teachSubmit" class="secondary-button" data-i18n="runTeachPack">生成 Teaching Pack</button>
+            </div>
+            <button id="relinkSubmit" class="secondary-button" data-i18n="runRelink">生成 Relink Review</button>
+            <div id="smartResults" class="result-list"></div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2 data-i18n="search">搜索</h2>
+          </div>
+          <div class="stack">
+            <input id="searchQuery" data-i18n-placeholder="searchPlaceholder" placeholder="搜索笔记">
+            <button id="searchSubmit" class="secondary-button" data-i18n="runSearch">执行搜索</button>
+            <div id="searchResults" class="result-list"></div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2 data-i18n="reviewQueue">Review 队列</h2>
+            <button id="refreshReviews" class="ghost-button" data-i18n="refresh">刷新</button>
+          </div>
+          <div id="reviewResults" class="result-list"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2 data-i18n="maintenance">维护</h2>
+            <button id="refreshMaintenance" class="ghost-button" data-i18n="refresh">刷新</button>
+          </div>
+          <div class="stack maintenance-buttons">
+            <button data-target="duplicates" class="ghost-button maintenance-trigger" data-i18n="duplicates">重复候选</button>
+            <button data-target="orphans" class="ghost-button maintenance-trigger" data-i18n="orphans">孤儿笔记</button>
+            <button data-target="metadata-issues" class="ghost-button maintenance-trigger" data-i18n="metadataIssues">元数据问题</button>
+          </div>
+          <div id="maintenanceResults" class="result-list"></div>
+        </section>
+
+        <section class="panel panel-wide console-panel">
+          <div class="panel-head">
+            <h2 data-i18n="console">控制台</h2>
+            <button id="clearConsole" class="ghost-button" data-i18n="clear">清空</button>
+          </div>
+          <pre id="consoleOutput" class="console-output" data-i18n="consoleWaiting">等待操作...</pre>
+        </section>
+      </main>
+    </div>
+
+    <script src="/ui/assets/app.js" defer></script>
+  </body>
+</html>
