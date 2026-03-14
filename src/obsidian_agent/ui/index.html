@@ -12,7 +12,10 @@
         <div class="hero-copy">
           <p class="eyebrow">LLM2Obsidian</p>
           <div class="hero-topline">
-            <h1 data-i18n="heroTitle">控制台</h1>
+            <div>
+              <h1 data-i18n="heroTitle">控制台</h1>
+              <p class="lede" data-i18n="heroLede">配置模型和 Obsidian 连接，并在浏览器里直接运行核心工作流。</p>
+            </div>
             <label class="language-switcher">
               <span data-i18n="languageLabel">语言</span>
               <select id="languageSelect" aria-label="Language">
@@ -21,27 +24,20 @@
               </select>
             </label>
           </div>
-          <p class="lede" data-i18n="heroLede">
-            配置模型和 Obsidian 连接，并在浏览器里直接运行核心工作流。
-          </p>
           <div class="token-row">
             <input
               id="adminToken"
               type="password"
               data-i18n-placeholder="adminTokenPlaceholder"
-              placeholder="输入 UI 管理 token"
+              placeholder="输入 UI 管理 Token"
             >
-            <button id="saveAdminToken" class="secondary-button" data-i18n="saveAdminToken">
-              保存 Token
-            </button>
+            <button id="saveAdminToken" class="secondary-button" data-i18n="saveAdminToken">保存 Token</button>
           </div>
         </div>
         <div class="status-card">
           <span id="healthBadge" class="badge" data-i18n="healthChecking">检查中</span>
           <p id="envPath" class="env-path" data-i18n="envLoading">正在加载运行时信息...</p>
-          <button id="reloadRuntime" class="secondary-button" data-i18n="reloadRuntime">
-            重新加载运行时
-          </button>
+          <button id="reloadRuntime" class="secondary-button" data-i18n="reloadRuntime">重新加载运行时</button>
         </div>
       </header>
 
@@ -110,30 +106,37 @@
           </div>
         </section>
 
-        <section class="panel">
+        <section class="panel panel-wide smart-panel">
           <div class="panel-head">
             <h2 data-i18n="smartErrorCapture">错题智能分析</h2>
           </div>
-          <div class="stack">
-            <input id="smartTitle" data-i18n-placeholder="smartTitlePlaceholder" placeholder="例如：把 sizeof 当成 strlen">
-            <textarea id="smartPrompt" rows="5" data-i18n-placeholder="smartPromptPlaceholder" placeholder="描述题目、错误结论和正确答案。"></textarea>
-            <textarea id="smartCode" rows="6" data-i18n-placeholder="smartCodePlaceholder" placeholder="贴上相关的 C 代码。"></textarea>
-            <textarea id="smartAnalysis" rows="4" data-i18n-placeholder="smartAnalysisPlaceholder" placeholder="写下你当时的思路。"></textarea>
-            <button id="smartCaptureSubmit" class="primary-button" data-i18n="runSmartCapture">生成 Error Node</button>
-            <div class="inline-form">
-              <input id="nodePackKey" data-i18n-placeholder="nodePackPlaceholder" placeholder="输入 node_key，例如 error/sizeof-vs-strlen">
-              <button id="nodePackSubmit" class="secondary-button" data-i18n="runNodePack">生成 Node Pack</button>
+          <div class="smart-layout">
+            <div class="stack smart-form">
+              <input id="smartTitle" data-i18n-placeholder="smartTitlePlaceholder" placeholder="例如：把 sizeof 当成 strlen">
+              <textarea id="smartPrompt" rows="5" data-i18n-placeholder="smartPromptPlaceholder" placeholder="描述题目、错误结论和正确答案。"></textarea>
+              <textarea id="smartCode" rows="6" data-i18n-placeholder="smartCodePlaceholder" placeholder="贴上相关 C 代码。"></textarea>
+              <textarea id="smartAnalysis" rows="4" data-i18n-placeholder="smartAnalysisPlaceholder" placeholder="写下你当时的思路。"></textarea>
+              <button id="smartCaptureSubmit" class="primary-button" data-i18n="runSmartCapture">生成 Error Node</button>
+              <div class="inline-form">
+                <input id="nodePackKey" data-i18n-placeholder="nodePackPlaceholder" placeholder="输入 node_key，例如 error/sizeof-vs-strlen">
+                <button id="nodePackSubmit" class="secondary-button" data-i18n="runNodePack">生成 Node Pack</button>
+              </div>
+              <div class="inline-form smart-action-row">
+                <select id="teachMode" aria-label="Teaching mode">
+                  <option value="auto" data-i18n="teachingModeAuto">自动</option>
+                  <option value="local" data-i18n="teachingModeLocal">本地</option>
+                  <option value="remote" data-i18n="teachingModeRemote">远端</option>
+                </select>
+                <button id="teachSubmit" class="secondary-button" data-i18n="runTeachPack">生成 Teaching Pack</button>
+                <button id="relinkSubmit" class="ghost-button" data-i18n="runRelink">生成 Relink Review</button>
+              </div>
             </div>
-            <div class="inline-form">
-              <select id="teachMode" aria-label="Teaching mode">
-                <option value="auto" data-i18n="teachingModeAuto">自动</option>
-                <option value="local" data-i18n="teachingModeLocal">本地</option>
-                <option value="remote" data-i18n="teachingModeRemote">远端</option>
-              </select>
-              <button id="teachSubmit" class="secondary-button" data-i18n="runTeachPack">生成 Teaching Pack</button>
+            <div class="smart-results-panel">
+              <div class="panel-subhead">
+                <span data-i18n="smartResultTitle">执行结果</span>
+              </div>
+              <div id="smartResults" class="result-list smart-results"></div>
             </div>
-            <button id="relinkSubmit" class="secondary-button" data-i18n="runRelink">生成 Relink Review</button>
-            <div id="smartResults" class="result-list"></div>
           </div>
         </section>
 

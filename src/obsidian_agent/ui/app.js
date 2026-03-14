@@ -9,7 +9,7 @@ const translations = {
     heroTitle: "控制台",
     heroLede: "配置模型和 Obsidian 连接，并在浏览器里直接运行核心工作流。",
     languageLabel: "语言",
-    adminTokenPlaceholder: "输入 UI 管理 token",
+    adminTokenPlaceholder: "输入 UI 管理 Token",
     saveAdminToken: "保存 Token",
     uiAdminToken: "UI 管理 Token",
     healthChecking: "检查中",
@@ -57,7 +57,7 @@ const translations = {
     smartErrorCapture: "错题智能分析",
     smartTitlePlaceholder: "例如：把 sizeof 当成 strlen",
     smartPromptPlaceholder: "描述题目、错误结论和正确答案。",
-    smartCodePlaceholder: "贴上相关的 C 代码。",
+    smartCodePlaceholder: "贴上相关 C 代码。",
     smartAnalysisPlaceholder: "写下你当时的思路。",
     runSmartCapture: "生成 Error Node",
     nodePackPlaceholder: "输入 node_key，例如 error/sizeof-vs-strlen",
@@ -67,6 +67,7 @@ const translations = {
     teachingModeAuto: "自动",
     teachingModeLocal: "本地",
     teachingModeRemote: "远端",
+    smartResultTitle: "执行结果",
     search: "搜索",
     searchPlaceholder: "搜索笔记",
     runSearch: "执行搜索",
@@ -83,25 +84,25 @@ const translations = {
     noItemsBody: "当前结果集为空。",
     noTargetNote: "没有目标笔记",
     scoreLabel: "分数",
-    runtimeLoaded: "已加载运行时",
-    reviewQueueRefreshed: "已刷新 Review 队列",
-    configSaved: "已保存配置",
-    runtimeReloaded: "已重新加载运行时",
-    demoVaultSeeded: "已生成示例知识库",
-    vaultReindexed: "已重建索引",
-    weeklyDigestDone: "周报任务结果",
-    captureComplete: "采集完成",
-    searchComplete: "搜索完成",
-    smartCaptureComplete: "错题分析完成",
+    runtimeLoaded: "运行时已加载",
+    reviewQueueRefreshed: "Review 队列已刷新",
+    configSaved: "配置已保存",
+    runtimeReloaded: "运行时已重新加载",
+    demoVaultSeeded: "示例知识库已生成",
+    vaultReindexed: "索引已重建",
+    weeklyDigestDone: "周报任务已完成",
+    captureComplete: "采集已完成",
+    searchComplete: "搜索已完成",
+    smartCaptureComplete: "错题分析已完成",
     nodePackComplete: "Node Pack 已生成",
     teachPackComplete: "Teaching Pack 已生成",
     relinkComplete: "Relink Review 已生成",
     startupError: "启动错误",
     consoleCleared: "控制台已清空。",
     maintenancePrefix: "维护结果",
-    tokenSaved: "已保存管理 token",
-    tokenMissing: "请先输入 UI 管理 token。",
-    unauthorized: "管理 token 缺失或无效。",
+    tokenSaved: "管理 Token 已保存",
+    tokenMissing: "请先输入 UI 管理 Token。",
+    unauthorized: "管理 Token 缺失或无效。",
   },
   en: {
     documentTitle: "LLM2Obsidian Control Panel",
@@ -166,6 +167,7 @@ const translations = {
     teachingModeAuto: "Auto",
     teachingModeLocal: "Local",
     teachingModeRemote: "Remote",
+    smartResultTitle: "Result",
     search: "Search",
     searchPlaceholder: "Search notes",
     runSearch: "Run Search",
@@ -188,10 +190,10 @@ const translations = {
     runtimeReloaded: "Runtime reloaded",
     demoVaultSeeded: "Demo vault seeded",
     vaultReindexed: "Vault reindexed",
-    weeklyDigestDone: "Weekly digest",
-    captureComplete: "Capture complete",
-    searchComplete: "Search complete",
-    smartCaptureComplete: "Smart error capture complete",
+    weeklyDigestDone: "Weekly digest completed",
+    captureComplete: "Capture completed",
+    searchComplete: "Search completed",
+    smartCaptureComplete: "Smart error capture completed",
     nodePackComplete: "Node pack generated",
     teachPackComplete: "Teaching pack generated",
     relinkComplete: "Relink review generated",
@@ -217,6 +219,15 @@ function t(key) {
   return translations[currentLanguage()][key] || key;
 }
 
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll("\"", "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
 function applyLanguage(lang) {
   window.localStorage.setItem("ui-language", lang);
   document.documentElement.lang = lang;
@@ -237,15 +248,19 @@ function logResult(label, payload) {
 
 async function api(path, options = {}) {
   const token = adminToken();
-  if (!token) {
+  const bootstrapAllowed = path === "/ui/api/runtime";
+  if (!token && !bootstrapAllowed) {
     throw new Error(t("tokenMissing"));
   }
+  const headers = {
+    "Content-Type": "application/json",
+    ...(options.headers || {}),
+  };
+  if (token) {
+    headers["X-Admin-Token"] = token;
+  }
   const response = await fetch(path, {
-    headers: {
-      "Content-Type": "application/json",
-      "X-Admin-Token": token,
-      ...(options.headers || {}),
-    },
+    headers,
     ...options,
   });
   const contentType = response.headers.get("content-type") || "";
@@ -257,6 +272,20 @@ async function api(path, options = {}) {
     throw new Error(typeof payload === "string" ? payload : JSON.stringify(payload));
   }
   return payload;
+}
+
+async function runUiAction(label, action) {
+  try {
+    const payload = await action();
+    if (payload !== undefined) {
+      logResult(label, payload);
+    }
+    return payload;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    logResult(label, message);
+    return undefined;
+  }
 }
 
 function setFormValues(values) {
@@ -310,7 +339,7 @@ function getFormValues() {
 function renderCards(target, items, formatter) {
   target.innerHTML = "";
   if (!items.length) {
-    target.innerHTML = `<div class="result-card"><strong>${t("noItemsTitle")}</strong><small>${t("noItemsBody")}</small></div>`;
+    target.innerHTML = `<div class="result-card"><strong>${escapeHtml(t("noItemsTitle"))}</strong><small>${escapeHtml(t("noItemsBody"))}</small></div>`;
     return;
   }
   for (const item of items) {
@@ -323,22 +352,6 @@ function renderCards(target, items, formatter) {
 
 function renderSmartResult(payload) {
   const target = document.getElementById("smartResults");
-  const weaknesses = (payload.weaknesses || [])
-    .map((item) => `<li>${item.name}: ${item.summary}</li>`)
-    .join("");
-  const generatedNodes = (payload.related_nodes || [])
-    .map((item) => `<li>${item.node_type}: ${item.title}</li>`)
-    .join("");
-  const relations = (((payload.pack || {}).edges) || [])
-    .map((item) => `<li>${item.relation_type} -> ${item.to_node_key} (${item.confidence})</li>`)
-    .join("");
-  const teachingSections = (payload.sections || [])
-    .map((item) => `<li><strong>${item.heading}</strong>: ${item.body}</li>`)
-    .join("");
-  const drills = (payload.drills || []).map((item) => `<li>${item}</li>`).join("");
-  const preview = payload.action_preview
-    ? `<small>dry-run: ${payload.action_preview.target_path}</small>`
-    : `<small>${payload.node ? payload.node.note_path || "" : (payload.pack ? payload.pack.anchor.note_path || "" : "")}</small>`;
   const title = payload.error ? payload.error.title : (payload.title || (payload.pack ? payload.pack.anchor.title : ""));
   const summary = payload.error
     ? payload.error.summary
@@ -346,35 +359,94 @@ function renderSmartResult(payload) {
   const secondary = payload.error
     ? payload.error.root_cause
     : (payload.overview || (payload.pack ? payload.pack.anchor.summary : ""));
-  const listHtml = [weaknesses, generatedNodes, teachingSections, relations, drills].filter((item) => item).join("")
-    || "<li>-</li>";
-  const markdown = payload.markdown ? `<pre class="console-output">${payload.markdown}</pre>` : "";
-  const reviewMeta = payload.review_id
-    ? `<small>review #${payload.review_id}: ${payload.proposal_path || ""}</small>`
+  const previewPath = payload.action_preview
+    ? payload.action_preview.target_path
+    : payload.node
+      ? payload.node.note_path || ""
+      : payload.pack
+        ? payload.pack.anchor.note_path || ""
+        : "";
+
+  const metaItems = [];
+  if (previewPath) metaItems.push(`path: ${escapeHtml(previewPath)}`);
+  if (payload.stored_edges) metaItems.push(`stored edges: ${escapeHtml(payload.stored_edges)}`);
+  if (payload.pack?.recommended_output_shape) metaItems.push(`shape: ${escapeHtml(payload.pack.recommended_output_shape)}`);
+  if (payload.pack?.token_budget_hint) metaItems.push(`budget: ${escapeHtml(payload.pack.token_budget_hint)}`);
+  if (payload.delivery_mode) metaItems.push(`delivery: ${escapeHtml(payload.delivery_mode)}`);
+  if (payload.review_id) metaItems.push(`review #${escapeHtml(payload.review_id)}`);
+
+  const listSections = [];
+  if ((payload.weaknesses || []).length) {
+    listSections.push(`
+      <section class="result-block">
+        <h3>Weaknesses</h3>
+        <ul>${payload.weaknesses.map((item) => `<li>${escapeHtml(item.name)}: ${escapeHtml(item.summary)}</li>`).join("")}</ul>
+      </section>
+    `);
+  }
+  if ((payload.related_nodes || []).length) {
+    listSections.push(`
+      <section class="result-block">
+        <h3>Related Nodes</h3>
+        <ul>${payload.related_nodes.map((item) => `<li>${escapeHtml(item.node_type)}: ${escapeHtml(item.title)}</li>`).join("")}</ul>
+      </section>
+    `);
+  }
+  if ((((payload.pack || {}).edges) || []).length) {
+    listSections.push(`
+      <section class="result-block">
+        <h3>Relations</h3>
+        <ul>${payload.pack.edges.map((item) => `<li>${escapeHtml(item.relation_type)} -> ${escapeHtml(item.to_node_key)} (${escapeHtml(item.confidence)})</li>`).join("")}</ul>
+      </section>
+    `);
+  }
+  if ((payload.sections || []).length) {
+    listSections.push(`
+      <section class="result-block">
+        <h3>Teaching Sections</h3>
+        <ul>${payload.sections.map((item) => `<li><strong>${escapeHtml(item.heading)}</strong>: ${escapeHtml(item.body)}</li>`).join("")}</ul>
+      </section>
+    `);
+  }
+  if ((payload.drills || []).length) {
+    listSections.push(`
+      <section class="result-block">
+        <h3>Practice Drills</h3>
+        <ul>${payload.drills.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+      </section>
+    `);
+  }
+
+  const markdown = payload.markdown
+    ? `
+      <details class="result-details">
+        <summary>Markdown Preview</summary>
+        <pre class="result-markdown">${escapeHtml(payload.markdown)}</pre>
+      </details>
+    `
     : "";
-  const edgeMeta = payload.stored_edges ? `<small>stored edges: ${payload.stored_edges}</small>` : "";
-  const packMeta = payload.pack
-    ? `<small>shape: ${payload.pack.recommended_output_shape || "-"} · budget: ${payload.pack.token_budget_hint || "-"}</small>`
+  const telemetry = payload.telemetry && Object.keys(payload.telemetry).length
+    ? `
+      <details class="result-details">
+        <summary>Telemetry</summary>
+        <pre class="result-json">${escapeHtml(JSON.stringify(payload.telemetry, null, 2))}</pre>
+      </details>
+    `
     : "";
-  const deliveryMeta = payload.delivery_mode
-    ? `<small>delivery: ${payload.delivery_mode}</small>`
-    : "";
-  const telemetryMeta = payload.telemetry && Object.keys(payload.telemetry).length
-    ? `<small>telemetry: ${JSON.stringify(payload.telemetry)}</small>`
-    : "";
+
   target.innerHTML = `
-    <article class="result-card">
-      <strong>${title}</strong>
-      <div>${summary}</div>
-      <div>${secondary}</div>
-      <ul>${listHtml}</ul>
-      ${preview}
-      ${edgeMeta}
-      ${packMeta}
-      ${deliveryMeta}
-      ${telemetryMeta}
-      ${reviewMeta}
+    <article class="result-card result-card-smart">
+      <div class="result-header">
+        <strong>${escapeHtml(title || "Smart Result")}</strong>
+        <div class="result-meta">${metaItems.map((item) => `<span>${item}</span>`).join("")}</div>
+      </div>
+      <div class="result-summary">${escapeHtml(summary)}</div>
+      <div class="result-secondary">${escapeHtml(secondary)}</div>
+      <div class="result-grid">
+        ${listSections.join("") || `<section class="result-block"><h3>Info</h3><div class="result-empty">No structured items returned.</div></section>`}
+      </div>
       ${markdown}
+      ${telemetry}
     </article>
   `;
 }
@@ -384,27 +456,27 @@ async function loadRuntime() {
   document.getElementById("healthBadge").textContent = runtime.health;
   document.getElementById("envPath").textContent = runtime.env_path;
   setFormValues(runtime.settings);
-  logResult(t("runtimeLoaded"), runtime);
+  return runtime;
 }
 
 async function loadReviews() {
   const payload = await api("/review/pending");
   renderCards(document.getElementById("reviewResults"), payload.items, (item) => `
-    <strong>#${item.id} · ${item.proposal_type}</strong>
-    <div>${item.source_note_path || ""}</div>
-    <small>${item.target_note_path || t("noTargetNote")} · ${item.risk_level}</small>
+    <strong>#${escapeHtml(item.id)} - ${escapeHtml(item.proposal_type)}</strong>
+    <div>${escapeHtml(item.source_note_path || "")}</div>
+    <small>${escapeHtml(item.target_note_path || t("noTargetNote"))} - ${escapeHtml(item.risk_level)}</small>
   `);
-  logResult(t("reviewQueueRefreshed"), payload);
+  return payload;
 }
 
 async function runMaintenance(target) {
   const payload = await api(`/maintenance/${target}`);
   renderCards(document.getElementById("maintenanceResults"), payload.items, (item) => `
-    <strong>${item.path}</strong>
-    <div>${item.reason}</div>
-    <small>${t("scoreLabel")}: ${item.score}</small>
+    <strong>${escapeHtml(item.path)}</strong>
+    <div>${escapeHtml(item.reason)}</div>
+    <small>${escapeHtml(t("scoreLabel"))}: ${escapeHtml(item.score)}</small>
   `);
-  logResult(`${t("maintenancePrefix")} ${target}`, payload);
+  return payload;
 }
 
 document.getElementById("saveAdminToken").addEventListener("click", () => {
@@ -417,52 +489,50 @@ document.getElementById("saveAdminToken").addEventListener("click", () => {
 });
 
 document.getElementById("saveConfig").addEventListener("click", async () => {
-  const payload = await api("/ui/api/config", {
+  const payload = await runUiAction(t("configSaved"), () => api("/ui/api/config", {
     method: "PUT",
     body: JSON.stringify(getFormValues()),
-  });
-  logResult(t("configSaved"), payload);
-  setFormValues(payload.settings);
+  }));
+  if (payload) {
+    setFormValues(payload.settings);
+  }
 });
 
 document.getElementById("reloadRuntime").addEventListener("click", async () => {
-  const payload = await api("/ui/api/reload", { method: "POST" });
-  logResult(t("runtimeReloaded"), payload);
-  setFormValues(payload.settings);
+  const payload = await runUiAction(t("runtimeReloaded"), () => api("/ui/api/reload", { method: "POST" }));
+  if (payload) {
+    setFormValues(payload.settings);
+  }
 });
 
 document.getElementById("seedDemo").addEventListener("click", async () => {
-  const payload = await api("/ui/api/seed-demo", { method: "POST" });
-  logResult(t("demoVaultSeeded"), payload);
+  await runUiAction(t("demoVaultSeeded"), () => api("/ui/api/seed-demo", { method: "POST" }));
 });
 
 document.getElementById("reindex").addEventListener("click", async () => {
-  const payload = await api("/ui/api/reindex", { method: "POST" });
-  logResult(t("vaultReindexed"), payload);
+  await runUiAction(t("vaultReindexed"), () => api("/ui/api/reindex", { method: "POST" }));
 });
 
 document.getElementById("runDigest").addEventListener("click", async () => {
-  const payload = await api("/ui/api/weekly-digest", {
+  await runUiAction(t("weeklyDigestDone"), () => api("/ui/api/weekly-digest", {
     method: "POST",
     body: JSON.stringify({ week_key: document.getElementById("weekKey").value }),
-  });
-  logResult(t("weeklyDigestDone"), payload);
+  }));
 });
 
 document.getElementById("captureSubmit").addEventListener("click", async () => {
-  const payload = await api("/capture/text", {
+  await runUiAction(t("captureComplete"), () => api("/capture/text", {
     method: "POST",
     body: JSON.stringify({
       title: document.getElementById("captureTitle").value,
       text: document.getElementById("captureText").value,
       source_ref: "ui",
     }),
-  });
-  logResult(t("captureComplete"), payload);
+  }));
 });
 
 document.getElementById("smartCaptureSubmit").addEventListener("click", async () => {
-  const payload = await api("/smart/error-capture", {
+  const payload = await runUiAction(t("smartCaptureComplete"), () => api("/smart/error-capture", {
     method: "POST",
     body: JSON.stringify({
       title: document.getElementById("smartTitle").value,
@@ -472,39 +542,42 @@ document.getElementById("smartCaptureSubmit").addEventListener("click", async ()
       language: "c",
       source_ref: "ui-smart",
     }),
-  });
-  document.getElementById("nodePackKey").value = payload.node.node_key;
-  renderSmartResult(payload);
-  logResult(t("smartCaptureComplete"), payload);
+  }));
+  if (payload) {
+    document.getElementById("nodePackKey").value = payload.node.node_key;
+    renderSmartResult(payload);
+  }
 });
 
 document.getElementById("nodePackSubmit").addEventListener("click", async () => {
-  const payload = await api("/smart/node-pack", {
+  const payload = await runUiAction(t("nodePackComplete"), () => api("/smart/node-pack", {
     method: "POST",
     body: JSON.stringify({
       node_key: document.getElementById("nodePackKey").value,
       top_k: 5,
     }),
-  });
-  renderSmartResult(payload);
-  logResult(t("nodePackComplete"), payload);
+  }));
+  if (payload) {
+    renderSmartResult(payload);
+  }
 });
 
 document.getElementById("teachSubmit").addEventListener("click", async () => {
-  const payload = await api("/smart/teach", {
+  const payload = await runUiAction(t("teachPackComplete"), () => api("/smart/teach", {
     method: "POST",
     body: JSON.stringify({
       node_key: document.getElementById("nodePackKey").value,
       top_k: 5,
       delivery_mode: document.getElementById("teachMode").value,
     }),
-  });
-  renderSmartResult(payload);
-  logResult(t("teachPackComplete"), payload);
+  }));
+  if (payload) {
+    renderSmartResult(payload);
+  }
 });
 
 document.getElementById("relinkSubmit").addEventListener("click", async () => {
-  const payload = await api("/smart/relink", {
+  const payload = await runUiAction(t("relinkComplete"), () => api("/smart/relink", {
     method: "POST",
     body: JSON.stringify({
       node_key: document.getElementById("nodePackKey").value,
@@ -512,30 +585,49 @@ document.getElementById("relinkSubmit").addEventListener("click", async () => {
       create_review: true,
       dry_run: false,
     }),
-  });
-  renderSmartResult(payload);
-  logResult(t("relinkComplete"), payload);
+  }));
+  if (payload) {
+    renderSmartResult(payload);
+  }
 });
 
 document.getElementById("searchSubmit").addEventListener("click", async () => {
   const query = document.getElementById("searchQuery").value;
-  const payload = await api(`/search?q=${encodeURIComponent(query)}`);
-  renderCards(document.getElementById("searchResults"), payload.results, (item) => `
-    <strong>${item.path}</strong>
-    <div>${item.reason}</div>
-    <small>${t("scoreLabel")}: ${item.score}</small>
-  `);
-  logResult(t("searchComplete"), payload);
+  const payload = await runUiAction(t("searchComplete"), () => api(`/search?q=${encodeURIComponent(query)}`));
+  if (payload) {
+    renderCards(document.getElementById("searchResults"), payload.results, (item) => `
+      <strong>${escapeHtml(item.path)}</strong>
+      <div>${escapeHtml(item.reason)}</div>
+      <small>${escapeHtml(t("scoreLabel"))}: ${escapeHtml(item.score)}</small>
+    `);
+  }
 });
 
-document.getElementById("refreshReviews").addEventListener("click", loadReviews);
+document.getElementById("refreshReviews").addEventListener("click", async () => {
+  await runUiAction(t("reviewQueueRefreshed"), loadReviews);
+});
+
 document.getElementById("refreshMaintenance").addEventListener("click", async () => {
-  await runMaintenance("duplicates");
+  const payload = await runUiAction(`${t("maintenancePrefix")} duplicates`, () => runMaintenance("duplicates"));
+  if (payload) {
+    renderCards(document.getElementById("maintenanceResults"), payload.items, (item) => `
+      <strong>${escapeHtml(item.path)}</strong>
+      <div>${escapeHtml(item.reason)}</div>
+      <small>${escapeHtml(t("scoreLabel"))}: ${escapeHtml(item.score)}</small>
+    `);
+  }
 });
 
 for (const button of document.querySelectorAll(".maintenance-trigger")) {
   button.addEventListener("click", async () => {
-    await runMaintenance(button.dataset.target);
+    const payload = await runUiAction(`${t("maintenancePrefix")} ${button.dataset.target}`, () => runMaintenance(button.dataset.target));
+    if (payload) {
+      renderCards(document.getElementById("maintenanceResults"), payload.items, (item) => `
+        <strong>${escapeHtml(item.path)}</strong>
+        <div>${escapeHtml(item.reason)}</div>
+        <small>${escapeHtml(t("scoreLabel"))}: ${escapeHtml(item.score)}</small>
+      `);
+    }
   });
 }
 
@@ -550,6 +642,5 @@ languageSelect.addEventListener("change", () => {
 applyLanguage(currentLanguage());
 adminTokenInput.value = adminToken();
 
-loadRuntime()
-  .then(loadReviews)
-  .catch((error) => logResult(t("startupError"), error.message));
+runUiAction(t("runtimeLoaded"), loadRuntime)
+  .then(() => runUiAction(t("reviewQueueRefreshed"), loadReviews));
