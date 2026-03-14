@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
@@ -132,6 +132,27 @@ def _preserve_secret(submitted: str, current: str | None) -> str:
     return submitted
 
 
+def _ensure_ui_access(
+    request: Request,
+    x_admin_token: str | None,
+    bootstrap_token: str | None = None,
+) -> None:
+    configured_token = request.app.state.container.settings.ui_admin_token
+    if configured_token:
+        if x_admin_token != configured_token:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or missing admin token.",
+            )
+        return
+    if bootstrap_token and x_admin_token == bootstrap_token:
+        return
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail="UI admin token is not configured. Set and save a new token first.",
+    )
+
+
 @router.get("/")
 async def dashboard() -> FileResponse:
     return FileResponse(_ui_root() / "index.html")
@@ -145,7 +166,6 @@ async def dashboard_alias() -> FileResponse:
 @router.get("/ui/api/runtime")
 async def runtime_state(
     request: Request,
-    _: None = Depends(require_ui_admin_token),
 ) -> dict[str, object]:
     container = request.app.state.container
     settings = container.settings
@@ -153,6 +173,7 @@ async def runtime_state(
         "app_name": settings.app_name,
         "health": "ok",
         "env_path": str(_env_path(request)),
+        "bootstrap_required": not bool(settings.ui_admin_token),
         "settings": _settings_to_payload(request, mask_secrets=True).model_dump(mode="json"),
     }
 
@@ -174,8 +195,9 @@ async def load_config(
 async def save_config(
     payload: UiConfigPayload,
     request: Request,
-    _: None = Depends(require_ui_admin_token),
+    x_admin_token: str | None = Header(default=None, alias="X-Admin-Token"),
 ) -> dict[str, object]:
+    _ensure_ui_access(request, x_admin_token, bootstrap_token=payload.ui_admin_token.strip() or None)
     current = _load_settings_from_env(request)
     env_values = {
         "UI_ADMIN_TOKEN": _preserve_secret(payload.ui_admin_token, current.ui_admin_token),
