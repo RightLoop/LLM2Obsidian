@@ -60,6 +60,8 @@ const translations = {
     smartCodePlaceholder: "贴上相关的 C 代码。",
     smartAnalysisPlaceholder: "写下你当时的思路。",
     runSmartCapture: "生成 Error Node",
+    nodePackPlaceholder: "输入 node_key，例如 error/sizeof-vs-strlen",
+    runNodePack: "生成 Node Pack",
     search: "搜索",
     searchPlaceholder: "搜索笔记",
     runSearch: "执行搜索",
@@ -86,6 +88,7 @@ const translations = {
     captureComplete: "采集完成",
     searchComplete: "搜索完成",
     smartCaptureComplete: "错题分析完成",
+    nodePackComplete: "Node Pack 已生成",
     startupError: "启动错误",
     consoleCleared: "控制台已清空。",
     maintenancePrefix: "维护结果",
@@ -149,6 +152,8 @@ const translations = {
     smartCodePlaceholder: "Paste the relevant C code.",
     smartAnalysisPlaceholder: "Write down your original reasoning.",
     runSmartCapture: "Create Error Node",
+    nodePackPlaceholder: "Enter a node_key such as error/sizeof-vs-strlen",
+    runNodePack: "Build Node Pack",
     search: "Search",
     searchPlaceholder: "Search notes",
     runSearch: "Run Search",
@@ -175,6 +180,7 @@ const translations = {
     captureComplete: "Capture complete",
     searchComplete: "Search complete",
     smartCaptureComplete: "Smart error capture complete",
+    nodePackComplete: "Node pack generated",
     startupError: "Startup error",
     consoleCleared: "Console cleared.",
     maintenancePrefix: "Maintenance",
@@ -306,15 +312,18 @@ function renderSmartResult(payload) {
   const weaknesses = (payload.weaknesses || [])
     .map((item) => `<li>${item.name}: ${item.summary}</li>`)
     .join("");
+  const relations = (((payload.pack || {}).edges) || [])
+    .map((item) => `<li>${item.relation_type} -> ${item.to_node_key} (${item.confidence})</li>`)
+    .join("");
   const preview = payload.action_preview
     ? `<small>dry-run: ${payload.action_preview.target_path}</small>`
-    : `<small>${payload.node.note_path || ""}</small>`;
+    : `<small>${payload.node ? payload.node.note_path || "" : payload.pack.anchor.note_path || ""}</small>`;
   target.innerHTML = `
     <article class="result-card">
-      <strong>${payload.error.title}</strong>
-      <div>${payload.error.summary}</div>
-      <div>${payload.error.root_cause}</div>
-      <ul>${weaknesses || "<li>-</li>"}</ul>
+      <strong>${payload.error ? payload.error.title : payload.pack.anchor.title}</strong>
+      <div>${payload.error ? payload.error.summary : payload.pack.summary}</div>
+      <div>${payload.error ? payload.error.root_cause : payload.pack.anchor.summary}</div>
+      <ul>${weaknesses || relations || "<li>-</li>"}</ul>
       ${preview}
     </article>
   `;
@@ -414,8 +423,21 @@ document.getElementById("smartCaptureSubmit").addEventListener("click", async ()
       source_ref: "ui-smart",
     }),
   });
+  document.getElementById("nodePackKey").value = payload.node.node_key;
   renderSmartResult(payload);
   logResult(t("smartCaptureComplete"), payload);
+});
+
+document.getElementById("nodePackSubmit").addEventListener("click", async () => {
+  const payload = await api("/smart/node-pack", {
+    method: "POST",
+    body: JSON.stringify({
+      node_key: document.getElementById("nodePackKey").value,
+      top_k: 5,
+    }),
+  });
+  renderSmartResult(payload);
+  logResult(t("nodePackComplete"), payload);
 });
 
 document.getElementById("searchSubmit").addEventListener("click", async () => {

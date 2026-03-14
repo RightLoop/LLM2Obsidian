@@ -79,6 +79,7 @@ python -m compileall src scripts
 - `GET /maintenance/metadata-issues`
 - `POST /maintenance/weekly-digest`
 - `POST /smart/error-capture`
+- `POST /smart/node-pack`
 
 ## Delivery Notes
 

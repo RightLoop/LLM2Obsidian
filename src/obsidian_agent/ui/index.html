@@ -120,6 +120,10 @@
             <textarea id="smartCode" rows="6" data-i18n-placeholder="smartCodePlaceholder" placeholder="贴上相关的 C 代码。"></textarea>
             <textarea id="smartAnalysis" rows="4" data-i18n-placeholder="smartAnalysisPlaceholder" placeholder="写下你当时的思路。"></textarea>
             <button id="smartCaptureSubmit" class="primary-button" data-i18n="runSmartCapture">生成 Error Node</button>
+            <div class="inline-form">
+              <input id="nodePackKey" data-i18n-placeholder="nodePackPlaceholder" placeholder="输入 node_key，例如 error/sizeof-vs-strlen">
+              <button id="nodePackSubmit" class="secondary-button" data-i18n="runNodePack">生成 Node Pack</button>
+            </div>
             <div id="smartResults" class="result-list"></div>
           </div>
         </section>

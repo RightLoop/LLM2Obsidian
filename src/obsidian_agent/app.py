@@ -17,6 +17,7 @@ from obsidian_agent.integrations.ollama_embeddings_client import OllamaEmbedding
 from obsidian_agent.integrations.openai_client import OpenAIResponsesClient
 from obsidian_agent.logging import configure_logging, trace_middleware
 from obsidian_agent.services.capture_service import CaptureService
+from obsidian_agent.services.context_compressor_service import ContextCompressorService
 from obsidian_agent.services.embeddings_service import DeterministicEmbeddingsClient, EmbeddingsService
 from obsidian_agent.services.error_extractor_service import ErrorExtractorService
 from obsidian_agent.services.indexing_service import IndexingService
@@ -25,9 +26,12 @@ from obsidian_agent.services.maintenance_service import MaintenanceService
 from obsidian_agent.services.node_writer_service import NodeWriterService
 from obsidian_agent.services.normalize_service import NormalizeService
 from obsidian_agent.services.obsidian_service import ObsidianService
+from obsidian_agent.services.relation_miner_service import RelationMinerService
 from obsidian_agent.services.retrieval_service import RetrievalService
 from obsidian_agent.services.review_service import ReviewService
+from obsidian_agent.services.routing_policy_service import RoutingPolicyService
 from obsidian_agent.services.smart_capture_service import SmartCaptureService
+from obsidian_agent.services.smart_node_pack_service import SmartNodePackService
 from obsidian_agent.services.synthesis_service import SynthesisService
 from obsidian_agent.services.weakness_diagnoser_service import WeaknessDiagnoserService
 from obsidian_agent.storage.db import create_session_factory
@@ -46,6 +50,7 @@ class AppContainer:
     session_factory: sessionmaker
     obsidian_service: ObsidianService
     llm_service: LLMService
+    smart_llm_service: LLMService
     capture_workflow: CaptureWorkflow
     retrieval_service: RetrievalService
     review_service: ReviewService
@@ -56,6 +61,7 @@ class AppContainer:
     maintenance_workflow: MaintenanceWorkflow
     link_workflow: LinkWorkflow
     smart_capture_service: SmartCaptureService
+    smart_node_pack_service: SmartNodePackService
 
 
 def _template_path(name: str) -> Path:
@@ -83,6 +89,13 @@ def build_container(settings: Settings | None = None) -> AppContainer:
         else None
     )
     obsidian_service = ObsidianService(settings, rest_client)
+    ollama_llm_client = OllamaChatClient(
+        base_url=settings.ollama_base_url,
+        model=settings.ollama_json_model,
+        timeout_seconds=settings.ollama_timeout_seconds,
+        retry_attempts=settings.http_retry_attempts,
+        retry_backoff_seconds=settings.http_retry_backoff_seconds,
+    )
     llm_client = None
     provider = settings.llm_provider.lower()
     if provider in {"auto", "deepseek"} and settings.deepseek_api_key:
@@ -104,14 +117,9 @@ def build_container(settings: Settings | None = None) -> AppContainer:
             retry_backoff_seconds=settings.http_retry_backoff_seconds,
         )
     elif provider == "ollama":
-        llm_client = OllamaChatClient(
-            base_url=settings.ollama_base_url,
-            model=settings.ollama_json_model,
-            timeout_seconds=settings.ollama_timeout_seconds,
-            retry_attempts=settings.http_retry_attempts,
-            retry_backoff_seconds=settings.http_retry_backoff_seconds,
-        )
+        llm_client = ollama_llm_client
     llm_service = LLMService(llm_client)
+    smart_llm_service = LLMService(ollama_llm_client) if provider == "ollama" else llm_service
     embedding_client = None
     if settings.embeddings_provider.lower() == "ollama":
         embedding_client = OllamaEmbeddingsClient(
@@ -151,8 +159,12 @@ def build_container(settings: Settings | None = None) -> AppContainer:
     )
     maintenance_workflow = MaintenanceWorkflow(maintenance_service)
     link_workflow = LinkWorkflow(retrieval_service)
+    routing_policy = RoutingPolicyService(
+        primary_llm_service=llm_service,
+        local_llm_service=smart_llm_service,
+    )
     smart_capture_service = SmartCaptureService(
-        error_extractor=ErrorExtractorService(llm_service),
+        error_extractor=ErrorExtractorService(smart_llm_service),
         weakness_diagnoser=WeaknessDiagnoserService(),
         node_writer=NodeWriterService(
             session_factory=session_factory,
@@ -160,11 +172,17 @@ def build_container(settings: Settings | None = None) -> AppContainer:
             error_template_path=_template_path("error_node.md.tmpl"),
         ),
     )
+    smart_node_pack_service = SmartNodePackService(
+        session_factory=session_factory,
+        relation_miner=RelationMinerService(routing_policy),
+        context_compressor=ContextCompressorService(routing_policy),
+    )
     return AppContainer(
         settings=settings,
         session_factory=session_factory,
         obsidian_service=obsidian_service,
         llm_service=llm_service,
+        smart_llm_service=smart_llm_service,
         capture_workflow=capture_workflow,
         retrieval_service=retrieval_service,
         review_service=review_service,
@@ -175,6 +193,7 @@ def build_container(settings: Settings | None = None) -> AppContainer:
         maintenance_workflow=maintenance_workflow,
         link_workflow=link_workflow,
         smart_capture_service=smart_capture_service,
+        smart_node_pack_service=smart_node_pack_service,
     )
 
 

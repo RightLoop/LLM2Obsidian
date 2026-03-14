@@ -62,6 +62,14 @@ curl -X POST http://127.0.0.1:8000/smart/error-capture ^
 
 This creates an Error Node note under the configured smart error folder and records a local `knowledge_nodes` / `error_occurrences` entry.
 
+To preview mined relations around that node:
+
+```bash
+curl -X POST http://127.0.0.1:8000/smart/node-pack ^
+  -H "Content-Type: application/json" ^
+  -d "{\"node_key\":\"error/sizeof-vs-strlen\",\"top_k\":5}"
+```
+
 ## 6. Generate and Apply a Review
 
 1. Call `POST /review/generate` with the new Inbox note path.
