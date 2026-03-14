@@ -340,7 +340,8 @@ function renderSmartResult(payload) {
   const secondary = payload.error
     ? payload.error.root_cause
     : (payload.overview || (payload.pack ? payload.pack.anchor.summary : ""));
-  const listHtml = [weaknesses, generatedNodes, teachingSections, relations, drills].filter((item) => item).join("") || "<li>-</li>";
+  const listHtml = [weaknesses, generatedNodes, teachingSections, relations, drills].filter((item) => item).join("")
+    || "<li>-</li>";
   const markdown = payload.markdown ? `<pre class="console-output">${payload.markdown}</pre>` : "";
   const reviewMeta = payload.review_id
     ? `<small>review #${payload.review_id}: ${payload.proposal_path || ""}</small>`
