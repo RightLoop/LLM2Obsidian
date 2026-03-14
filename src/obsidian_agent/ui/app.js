@@ -63,6 +63,7 @@ const translations = {
     nodePackPlaceholder: "输入 node_key，例如 error/sizeof-vs-strlen",
     runNodePack: "生成 Node Pack",
     runTeachPack: "生成 Teaching Pack",
+    runRelink: "生成 Relink Review",
     search: "搜索",
     searchPlaceholder: "搜索笔记",
     runSearch: "执行搜索",
@@ -91,6 +92,7 @@ const translations = {
     smartCaptureComplete: "错题分析完成",
     nodePackComplete: "Node Pack 已生成",
     teachPackComplete: "Teaching Pack 已生成",
+    relinkComplete: "Relink Review 已生成",
     startupError: "启动错误",
     consoleCleared: "控制台已清空。",
     maintenancePrefix: "维护结果",
@@ -157,6 +159,7 @@ const translations = {
     nodePackPlaceholder: "Enter a node_key such as error/sizeof-vs-strlen",
     runNodePack: "Build Node Pack",
     runTeachPack: "Build Teaching Pack",
+    runRelink: "Build Relink Review",
     search: "Search",
     searchPlaceholder: "Search notes",
     runSearch: "Run Search",
@@ -185,6 +188,7 @@ const translations = {
     smartCaptureComplete: "Smart error capture complete",
     nodePackComplete: "Node pack generated",
     teachPackComplete: "Teaching pack generated",
+    relinkComplete: "Relink review generated",
     startupError: "Startup error",
     consoleCleared: "Console cleared.",
     maintenancePrefix: "Maintenance",
@@ -335,6 +339,9 @@ function renderSmartResult(payload) {
     : (payload.overview || (payload.pack ? payload.pack.anchor.summary : ""));
   const listHtml = weaknesses || teachingSections || relations || drills || "<li>-</li>";
   const markdown = payload.markdown ? `<pre class="console-output">${payload.markdown}</pre>` : "";
+  const reviewMeta = payload.review_id
+    ? `<small>review #${payload.review_id}: ${payload.proposal_path || ""}</small>`
+    : "";
   target.innerHTML = `
     <article class="result-card">
       <strong>${title}</strong>
@@ -342,6 +349,7 @@ function renderSmartResult(payload) {
       <div>${secondary}</div>
       <ul>${listHtml}</ul>
       ${preview}
+      ${reviewMeta}
       ${markdown}
     </article>
   `;
@@ -468,6 +476,20 @@ document.getElementById("teachSubmit").addEventListener("click", async () => {
   });
   renderSmartResult(payload);
   logResult(t("teachPackComplete"), payload);
+});
+
+document.getElementById("relinkSubmit").addEventListener("click", async () => {
+  const payload = await api("/smart/relink", {
+    method: "POST",
+    body: JSON.stringify({
+      node_key: document.getElementById("nodePackKey").value,
+      top_k: 5,
+      create_review: true,
+      dry_run: false,
+    }),
+  });
+  renderSmartResult(payload);
+  logResult(t("relinkComplete"), payload);
 });
 
 document.getElementById("searchSubmit").addEventListener("click", async () => {

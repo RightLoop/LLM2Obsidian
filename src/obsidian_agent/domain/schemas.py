@@ -255,3 +255,19 @@ class TeachingPackResponse(BaseModel):
     sections: list[TeachingSection] = Field(default_factory=list)
     drills: list[str] = Field(default_factory=list)
     markdown: str
+
+
+class SmartRelinkRequest(BaseModel):
+    node_key: str = Field(min_length=3)
+    top_k: int = Field(default=5, ge=1, le=10)
+    create_review: bool = True
+    dry_run: bool = True
+
+
+class SmartRelinkResponse(BaseModel):
+    pack: RelationPack
+    related_section_markdown: str
+    stored_edges: int = 0
+    review_id: int | None = None
+    proposal_path: str | None = None
+    action_preview: ActionPreview | None = None

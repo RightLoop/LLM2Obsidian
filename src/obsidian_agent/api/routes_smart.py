@@ -8,6 +8,7 @@ from obsidian_agent.api.deps import get_api_container
 from obsidian_agent.domain.schemas import (
     ErrorCaptureRequest,
     NodePackRequest,
+    SmartRelinkRequest,
     TeachingPackRequest,
 )
 
@@ -62,3 +63,15 @@ async def smart_related_nodes(
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     return {"node_key": node_key, "items": [item.model_dump(mode="json") for item in items]}
+
+
+@router.post("/relink")
+async def smart_relink(
+    request: SmartRelinkRequest,
+    container: ContainerDep,
+) -> dict[str, object]:
+    try:
+        response = await container.smart_relink_service.relink(request)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return response.model_dump(mode="json")
