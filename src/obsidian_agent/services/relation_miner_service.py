@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 
 from obsidian_agent.domain.enums import KnowledgeRelationType
 from obsidian_agent.domain.schemas import KnowledgeEdgeSchema, KnowledgeNodeSchema
 from obsidian_agent.services.routing_policy_service import RoutingPolicyService
+
+logger = logging.getLogger(__name__)
 
 
 class RelationMinerService:
@@ -15,6 +18,7 @@ class RelationMinerService:
 
     def __init__(self, routing_policy: RoutingPolicyService) -> None:
         self.routing_policy = routing_policy
+        self.last_telemetry: dict[str, object] = {}
 
     async def mine(
         self,
@@ -23,7 +27,7 @@ class RelationMinerService:
     ) -> list[KnowledgeEdgeSchema]:
         if not candidates:
             return []
-        llm_service = self.routing_policy.for_structured_task()
+        llm_service = self.routing_policy.for_structured_task("relation_miner")
         raw = await llm_service.run_structured_task(
             instructions=(
                 "Return JSON with a top-level key 'relations' containing a list of objects with keys: "
@@ -33,6 +37,9 @@ class RelationMinerService:
             ),
             input_text=self._compose_input(anchor, candidates),
         )
+        self.last_telemetry = llm_service.pop_telemetry()
+        if self.last_telemetry:
+            logger.info("smart_telemetry task=relation_miner telemetry=%s", self.last_telemetry)
         relations = self._sanitize(raw, anchor, candidates)
         if relations:
             return relations

@@ -78,6 +78,8 @@ curl -X POST http://127.0.0.1:8000/smart/teach ^
   -d "{\"node_key\":\"error/sizeof-vs-strlen\",\"top_k\":5}"
 ```
 
+The smart endpoints now return a `telemetry` object with provider, model, prompt size, response size, and token usage when the active provider exposes usage data.
+
 To inspect nearby smart nodes without generating a teaching pack:
 
 ```bash

@@ -222,6 +222,7 @@ class SmartErrorCaptureResponse(BaseModel):
     related_nodes: list[KnowledgeNodeSchema] = Field(default_factory=list)
     action_preview: ActionPreview | None = None
     stored_edges: int = 0
+    telemetry: dict[str, object] = Field(default_factory=dict)
 
 
 class NodePackRequest(BaseModel):
@@ -232,6 +233,7 @@ class NodePackRequest(BaseModel):
 class SmartNodePackResponse(BaseModel):
     pack: RelationPack
     stored_edges: int = 0
+    telemetry: dict[str, object] = Field(default_factory=dict)
 
 
 class RelatedNodesRequest(BaseModel):
@@ -256,6 +258,7 @@ class TeachingPackResponse(BaseModel):
     sections: list[TeachingSection] = Field(default_factory=list)
     drills: list[str] = Field(default_factory=list)
     markdown: str
+    telemetry: dict[str, object] = Field(default_factory=dict)
 
 
 class SmartRelinkRequest(BaseModel):
@@ -272,3 +275,4 @@ class SmartRelinkResponse(BaseModel):
     review_id: int | None = None
     proposal_path: str | None = None
     action_preview: ActionPreview | None = None
+    telemetry: dict[str, object] = Field(default_factory=dict)

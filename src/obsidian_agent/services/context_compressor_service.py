@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import logging
+
 from obsidian_agent.domain.schemas import KnowledgeEdgeSchema, KnowledgeNodeSchema, RelationPack
 from obsidian_agent.services.routing_policy_service import RoutingPolicyService
+
+logger = logging.getLogger(__name__)
 
 
 class ContextCompressorService:
@@ -11,6 +15,7 @@ class ContextCompressorService:
 
     def __init__(self, routing_policy: RoutingPolicyService) -> None:
         self.routing_policy = routing_policy
+        self.last_telemetry: dict[str, object] = {}
 
     async def build_pack(
         self,
@@ -34,7 +39,7 @@ class ContextCompressorService:
     ) -> str:
         if not edges:
             return f"No high-confidence related nodes were found yet for {anchor.title}."
-        llm_service = self.routing_policy.for_structured_task()
+        llm_service = self.routing_policy.for_structured_task("context_compressor")
         raw = await llm_service.run_structured_task(
             instructions=(
                 "Return JSON with one key 'summary'. Summarize the anchor node and its highest-value relations "
@@ -53,6 +58,9 @@ class ContextCompressorService:
                 ]
             ),
         )
+        self.last_telemetry = llm_service.pop_telemetry()
+        if self.last_telemetry:
+            logger.info("smart_telemetry task=context_compressor telemetry=%s", self.last_telemetry)
         if isinstance(raw, dict) and str(raw.get("summary") or "").strip():
             return str(raw["summary"]).strip()
         top_edges = ", ".join(

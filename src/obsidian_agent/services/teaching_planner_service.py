@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from obsidian_agent.domain.schemas import (
     RelationPack,
     TeachingPackRequest,
@@ -10,6 +12,8 @@ from obsidian_agent.domain.schemas import (
 )
 from obsidian_agent.services.routing_policy_service import RoutingPolicyService
 from obsidian_agent.services.smart_node_pack_service import SmartNodePackService
+
+logger = logging.getLogger(__name__)
 
 
 class TeachingPlannerService:
@@ -22,6 +26,7 @@ class TeachingPlannerService:
     ) -> None:
         self.smart_node_pack_service = smart_node_pack_service
         self.routing_policy = routing_policy
+        self.last_telemetry: dict[str, object] = {}
 
     async def build_teaching_pack(self, request: TeachingPackRequest) -> TeachingPackResponse:
         pack_response = await self.smart_node_pack_service.build_node_pack(
@@ -45,10 +50,14 @@ class TeachingPlannerService:
             sections=payload["sections"],
             drills=payload["drills"],
             markdown=markdown,
+            telemetry={
+                "planner": self.last_telemetry,
+                "pack": pack_response.telemetry,
+            },
         )
 
     async def _plan_from_model(self, pack: RelationPack) -> dict[str, object] | None:
-        llm_service = self.routing_policy.for_teaching_task()
+        llm_service = self.routing_policy.for_teaching_task("teaching_planner")
         raw = await llm_service.run_structured_task(
             instructions=(
                 "Return JSON with keys: title, overview, sections, drills. "
@@ -71,6 +80,9 @@ class TeachingPlannerService:
                 ]
             ),
         )
+        self.last_telemetry = llm_service.pop_telemetry()
+        if self.last_telemetry:
+            logger.info("smart_telemetry task=teaching_planner telemetry=%s", self.last_telemetry)
         if not isinstance(raw, dict):
             return None
         title = str(raw.get("title") or "").strip()

@@ -50,6 +50,7 @@ def test_smart_teach_returns_markdown_and_sections() -> None:
     assert payload["sections"]
     assert payload["markdown"].startswith("# ")
     assert "## Practice Drills" in payload["markdown"]
+    assert "telemetry" in payload
 
 
 def test_smart_related_nodes_returns_related_entries() -> None:

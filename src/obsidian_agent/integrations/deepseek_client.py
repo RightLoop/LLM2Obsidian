@@ -50,4 +50,17 @@ class DeepSeekChatClient:
             )
         data = response.json()
         message_text = data["choices"][0]["message"]["content"]
-        return json.loads(message_text)
+        payload = json.loads(message_text)
+        usage = data.get("usage", {})
+        payload["_telemetry"] = {
+            "provider": "deepseek",
+            "model": data.get("model", self.model),
+            "prompt_chars": len(instructions) + len(input_text),
+            "response_chars": len(message_text),
+            "usage": {
+                "prompt_tokens": usage.get("prompt_tokens"),
+                "completion_tokens": usage.get("completion_tokens"),
+                "total_tokens": usage.get("total_tokens"),
+            },
+        }
+        return payload

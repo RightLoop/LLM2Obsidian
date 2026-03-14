@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import logging
+
 from obsidian_agent.domain.schemas import ErrorCaptureRequest, ErrorObject
 from obsidian_agent.services.llm_service import LLMService
 from obsidian_agent.utils.slugify import slugify
+
+logger = logging.getLogger(__name__)
 
 
 class ErrorExtractorService:
@@ -12,6 +16,7 @@ class ErrorExtractorService:
 
     def __init__(self, llm_service: LLMService) -> None:
         self.llm_service = llm_service
+        self.last_telemetry: dict[str, object] = {}
 
     async def extract(self, payload: ErrorCaptureRequest) -> ErrorObject:
         prompt_text = self._compose_input(payload)
@@ -23,6 +28,9 @@ class ErrorExtractorService:
             ),
             input_text=prompt_text,
         )
+        self.last_telemetry = self.llm_service.pop_telemetry()
+        if self.last_telemetry:
+            logger.info("smart_telemetry task=error_extract telemetry=%s", self.last_telemetry)
         if raw:
             return ErrorObject.model_validate(self._sanitize(raw, payload))
         return self._fallback(payload)
