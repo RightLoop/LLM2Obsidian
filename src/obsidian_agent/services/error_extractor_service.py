@@ -169,6 +169,19 @@ REQUIRED_CONCEPTS = {
     "array-pointer-decay": ["array", "pointer", "array-decay"],
 }
 
+OPTIONAL_CONCEPTS = {
+    "sizeof-vs-strlen": {"pointer", "array"},
+    "arr-vs-address-of-array": set(),
+    "char-pointer-vs-char-array": {"string-literal"},
+    "function-parameter-decay": {"array"},
+    "missing-null-terminator": {"strlen"},
+    "string-allocation-off-by-one": {"char-pointer", "strcpy", "memcpy", "buffer-capacity"},
+    "dangling-pointer-lifetime": {"stack-memory", "heap-memory", "use-after-free"},
+    "struct-layout-alignment": {"struct-layout"},
+    "pointer-arithmetic-off-by-one": {"loop-invariant"},
+    "array-pointer-decay": {"multi-dimensional-array", "pointer-level"},
+}
+
 CONCEPT_ALIASES = {
     "char*": "char-pointer",
     "char-pointer": "char-pointer",
@@ -284,7 +297,9 @@ class ErrorExtractorService:
     def _sanitize(self, raw: dict[str, object], payload: ErrorCaptureRequest) -> dict[str, object]:
         fallback = self._fallback(payload)
         signature = self._canonicalize_signature(str(raw.get("error_signature") or ""), payload)
-        if signature not in KNOWN_SIGNATURES:
+        if fallback.error_signature in KNOWN_SIGNATURES:
+            signature = fallback.error_signature
+        elif signature not in KNOWN_SIGNATURES:
             signature = fallback.error_signature
         merged_concepts = self._merge_concepts(
             self._coerce_list(raw.get("related_concepts")),
@@ -350,10 +365,12 @@ class ErrorExtractorService:
 
     def _infer_signature(self, prompt: str, code: str, analysis: str) -> str:
         haystack = f"{prompt}\n{code}\n{analysis}".lower()
+        if ("function" in haystack and "parameter" in haystack) or "形参" in haystack:
+            return "function-parameter-decay"
         mentions_string_length = any(
             token in haystack for token in ("strlen", "string length", "字符串长度", "逻辑长度", "可见长度")
         ) or ("长度" in haystack and any(token in haystack for token in ("char", "字符串", '"')))
-        if "sizeof" in haystack and '"' in haystack:
+        if "sizeof" in haystack and '"' in haystack and ("char" in haystack or "字符串" in haystack):
             return "sizeof-vs-strlen"
         if "sizeof" in haystack and mentions_string_length:
             return "sizeof-vs-strlen"
@@ -361,8 +378,6 @@ class ErrorExtractorService:
             return "arr-vs-address-of-array"
         if "char *" in haystack and ('"' in haystack or "char[" in haystack or "char []" in haystack):
             return "char-pointer-vs-char-array"
-        if ("function" in haystack and "parameter" in haystack) or "形参" in haystack:
-            return "function-parameter-decay"
         if "\\0" in haystack or "null terminator" in haystack or "终止符" in haystack:
             return "missing-null-terminator"
         if any(token in haystack for token in ("malloc(strlen", "malloc(len)", "少算一个字节", "strcpy", "memcpy")):
@@ -411,10 +426,12 @@ class ErrorExtractorService:
         if label in KNOWN_SIGNATURES:
             return label
         haystack = f"{label}\n{payload.prompt}\n{payload.code}\n{payload.user_analysis}".lower()
+        if ("function" in haystack and "parameter" in haystack) or "形参" in haystack:
+            return "function-parameter-decay"
         mentions_string_length = any(
             token in haystack for token in ("strlen", "string length", "字符串长度", "逻辑长度", "可见长度")
         ) or ("长度" in haystack and any(token in haystack for token in ("char", "字符串", '"')))
-        if "sizeof" in haystack and '"' in haystack:
+        if "sizeof" in haystack and '"' in haystack and ("char" in haystack or "字符串" in haystack):
             return "sizeof-vs-strlen"
         if "sizeof" in haystack and mentions_string_length:
             return "sizeof-vs-strlen"
@@ -422,8 +439,6 @@ class ErrorExtractorService:
             return "arr-vs-address-of-array"
         if "char-pointer" in label or ("char" in haystack and "pointer" in haystack and "array" in haystack):
             return "char-pointer-vs-char-array"
-        if "parameter" in haystack or "形参" in haystack:
-            return "function-parameter-decay"
         if "null" in haystack or "\\0" in haystack:
             return "missing-null-terminator"
         if "malloc" in haystack or "strcpy" in haystack or "memcpy" in haystack:
@@ -458,22 +473,43 @@ class ErrorExtractorService:
         signature: str,
         payload: ErrorCaptureRequest | None,
     ) -> list[str]:
-        extracted = [*REQUIRED_CONCEPTS.get(signature, []), *fallback_concepts]
+        extracted = [*REQUIRED_CONCEPTS.get(signature, [])]
+        optional_allowed = OPTIONAL_CONCEPTS.get(signature)
+        if signature in KNOWN_SIGNATURES:
+            for concept in fallback_concepts:
+                canonical = self._canonicalize_concept(concept)
+                if canonical in extracted:
+                    continue
+                if optional_allowed is not None and canonical not in optional_allowed:
+                    continue
+                extracted.append(canonical)
+        else:
+            extracted.extend(fallback_concepts)
         if signature not in KNOWN_SIGNATURES:
             extracted.extend(model_concepts)
         if payload is not None:
             haystack = f"{payload.prompt}\n{payload.code}\n{payload.user_analysis}".lower()
             if "&arr" in haystack and "address-of-array" not in extracted:
                 extracted.append("address-of-array")
-            if "arr" in haystack and "array" not in extracted:
+            if "arr" in haystack and "array" not in extracted and self._allows_optional(signature, "array"):
                 extracted.append("array")
-            if "pointer" in haystack and "pointer" not in extracted:
+            if "pointer" in haystack and "pointer" not in extracted and self._allows_optional(signature, "pointer"):
                 extracted.append("pointer")
-            if "char *" in haystack and "char-pointer" not in extracted:
+            if "char *" in haystack and "char-pointer" not in extracted and self._allows_optional(signature, "char-pointer"):
                 extracted.append("char-pointer")
-            if '="' not in haystack and '"' in haystack and "string-literal" not in extracted:
+            if (
+                '="' not in haystack
+                and '"' in haystack
+                and "string-literal" not in extracted
+                and self._allows_optional(signature, "string-literal")
+            ):
                 extracted.append("string-literal")
         return self._normalize_concepts(extracted)
+
+    def _allows_optional(self, signature: str, concept: str) -> bool:
+        if signature not in KNOWN_SIGNATURES:
+            return True
+        return concept in OPTIONAL_CONCEPTS.get(signature, set())
 
     def _normalize_concepts(self, concepts: list[str]) -> list[str]:
         normalized: list[str] = []
