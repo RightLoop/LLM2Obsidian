@@ -31,10 +31,17 @@ def test_dashboard_serves_html() -> None:
         vector_store_path=root / "vectors.json",
     )
     client = TestClient(create_app(settings))
+
     response = client.get("/")
     assert response.status_code == 200
     assert "LLM2Obsidian 控制台" in response.text
     assert "简体中文" in response.text
+    assert "鎺" not in response.text
+
+    app_js = client.get("/ui/assets/app.js")
+    assert app_js.status_code == 200
+    assert "function escapeHtml" in app_js.text
+    assert "LLM2Obsidian 控制台" in app_js.text
 
 
 def test_ui_api_requires_admin_token() -> None:
