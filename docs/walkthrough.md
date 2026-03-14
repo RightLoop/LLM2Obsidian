@@ -60,8 +60,7 @@ curl -X POST http://127.0.0.1:8000/smart/error-capture ^
   -d "{\"title\":\"sizeof vs strlen\",\"prompt\":\"I treated sizeof(arr) as the string length.\",\"code\":\"char arr[] = \\\"abc\\\"; printf(\\\"%zu\\\", sizeof(arr));\",\"user_analysis\":\"I assumed sizeof returns visible characters.\",\"language\":\"c\"}"
 ```
 
-This creates an Error Node note under the configured smart error folder and records a local `knowledge_nodes` / `error_occurrences` entry.
-The same call now also creates or reuses supporting Concept and Pitfall nodes under the smart nodes folder.
+This creates an Error Node note under the configured smart error folder and records local `knowledge_nodes` / `error_occurrences` entries. When the error implies a comparison or repeated confusion, it also creates or reuses support nodes in the smart nodes folder.
 
 To preview mined relations around that node:
 
