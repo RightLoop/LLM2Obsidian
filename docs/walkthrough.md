@@ -70,6 +70,20 @@ curl -X POST http://127.0.0.1:8000/smart/node-pack ^
   -d "{\"node_key\":\"error/sizeof-vs-strlen\",\"top_k\":5}"
 ```
 
+To generate a teaching-oriented explanation from that relation pack:
+
+```bash
+curl -X POST http://127.0.0.1:8000/smart/teach ^
+  -H "Content-Type: application/json" ^
+  -d "{\"node_key\":\"error/sizeof-vs-strlen\",\"top_k\":5}"
+```
+
+To inspect nearby smart nodes without generating a teaching pack:
+
+```bash
+curl "http://127.0.0.1:8000/smart/related-nodes?node_key=error/sizeof-vs-strlen&top_k=5"
+```
+
 ## 6. Generate and Apply a Review
 
 1. Call `POST /review/generate` with the new Inbox note path.

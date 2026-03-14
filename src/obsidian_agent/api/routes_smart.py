@@ -2,12 +2,14 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from obsidian_agent.api.deps import get_api_container
-from fastapi import HTTPException, status
-
-from obsidian_agent.domain.schemas import ErrorCaptureRequest, NodePackRequest
+from obsidian_agent.domain.schemas import (
+    ErrorCaptureRequest,
+    NodePackRequest,
+    TeachingPackRequest,
+)
 
 router = APIRouter(prefix="/smart", tags=["smart"])
 ContainerDep = Annotated[object, Depends(get_api_container)]
@@ -35,3 +37,28 @@ async def smart_node_pack(
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     return response.model_dump(mode="json")
+
+
+@router.post("/teach")
+async def smart_teach(
+    request: TeachingPackRequest,
+    container: ContainerDep,
+) -> dict[str, object]:
+    try:
+        response = await container.teaching_planner_service.build_teaching_pack(request)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return response.model_dump(mode="json")
+
+
+@router.get("/related-nodes")
+async def smart_related_nodes(
+    node_key: str = Query(min_length=3),
+    top_k: int = Query(default=5, ge=1, le=10),
+    container: object = Depends(get_api_container),
+) -> dict[str, object]:
+    try:
+        items = await container.smart_query_service.related_nodes(node_key=node_key, top_k=top_k)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return {"node_key": node_key, "items": [item.model_dump(mode="json") for item in items]}
