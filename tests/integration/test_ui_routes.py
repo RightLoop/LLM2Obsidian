@@ -34,19 +34,23 @@ def test_dashboard_serves_html() -> None:
 
     response = client.get("/")
     assert response.status_code == 200
-    assert "LLM2Obsidian 控制台" in response.text
-    assert "简体中文" in response.text
-    assert "鎺" not in response.text
+    assert "LLM2Obsidian" in response.text
+    assert "smart-layout" in response.text
+    assert "控制台" in response.text
+    assert "闄?" not in response.text
 
     app_js = client.get("/ui/assets/app.js")
     assert app_js.status_code == 200
     assert "function escapeHtml" in app_js.text
-    assert "LLM2Obsidian 控制台" in app_js.text
+    assert "smartResultTitle" in app_js.text
 
 
 def test_ui_api_requires_admin_token() -> None:
     client, _ = _build_ui_client(make_test_dir("ui_auth"))
-    response = client.get("/ui/api/runtime")
+    runtime = client.get("/ui/api/runtime")
+    assert runtime.status_code == 200
+
+    response = client.get("/ui/api/config")
     assert response.status_code == 401
 
 

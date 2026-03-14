@@ -67,6 +67,7 @@ const translations = {
     teachingModeAuto: "自动",
     teachingModeLocal: "本地",
     teachingModeRemote: "远端",
+    smartResultTitle: "执行结果",
     search: "搜索",
     searchPlaceholder: "搜索笔记",
     runSearch: "执行搜索",
@@ -166,6 +167,7 @@ const translations = {
     teachingModeAuto: "Auto",
     teachingModeLocal: "Local",
     teachingModeRemote: "Remote",
+    smartResultTitle: "Result",
     search: "Search",
     searchPlaceholder: "Search notes",
     runSearch: "Run Search",
@@ -188,10 +190,10 @@ const translations = {
     runtimeReloaded: "Runtime reloaded",
     demoVaultSeeded: "Demo vault seeded",
     vaultReindexed: "Vault reindexed",
-    weeklyDigestDone: "Weekly digest",
-    captureComplete: "Capture complete",
-    searchComplete: "Search complete",
-    smartCaptureComplete: "Smart error capture complete",
+    weeklyDigestDone: "Weekly digest completed",
+    captureComplete: "Capture completed",
+    searchComplete: "Search completed",
+    smartCaptureComplete: "Smart error capture completed",
     nodePackComplete: "Node pack generated",
     teachPackComplete: "Teaching pack generated",
     relinkComplete: "Relink review generated",
@@ -246,15 +248,19 @@ function logResult(label, payload) {
 
 async function api(path, options = {}) {
   const token = adminToken();
-  if (!token) {
+  const bootstrapAllowed = path === "/ui/api/runtime";
+  if (!token && !bootstrapAllowed) {
     throw new Error(t("tokenMissing"));
   }
+  const headers = {
+    "Content-Type": "application/json",
+    ...(options.headers || {}),
+  };
+  if (token) {
+    headers["X-Admin-Token"] = token;
+  }
   const response = await fetch(path, {
-    headers: {
-      "Content-Type": "application/json",
-      "X-Admin-Token": token,
-      ...(options.headers || {}),
-    },
+    headers,
     ...options,
   });
   const contentType = response.headers.get("content-type") || "";
@@ -266,6 +272,20 @@ async function api(path, options = {}) {
     throw new Error(typeof payload === "string" ? payload : JSON.stringify(payload));
   }
   return payload;
+}
+
+async function runUiAction(label, action) {
+  try {
+    const payload = await action();
+    if (payload !== undefined) {
+      logResult(label, payload);
+    }
+    return payload;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    logResult(label, message);
+    return undefined;
+  }
 }
 
 function setFormValues(values) {
@@ -332,27 +352,6 @@ function renderCards(target, items, formatter) {
 
 function renderSmartResult(payload) {
   const target = document.getElementById("smartResults");
-  const weaknesses = (payload.weaknesses || [])
-    .map((item) => `<li>${escapeHtml(item.name)}: ${escapeHtml(item.summary)}</li>`)
-    .join("");
-  const generatedNodes = (payload.related_nodes || [])
-    .map((item) => `<li>${escapeHtml(item.node_type)}: ${escapeHtml(item.title)}</li>`)
-    .join("");
-  const relations = (((payload.pack || {}).edges) || [])
-    .map((item) => `<li>${escapeHtml(item.relation_type)} -> ${escapeHtml(item.to_node_key)} (${escapeHtml(item.confidence)})</li>`)
-    .join("");
-  const teachingSections = (payload.sections || [])
-    .map((item) => `<li><strong>${escapeHtml(item.heading)}</strong>: ${escapeHtml(item.body)}</li>`)
-    .join("");
-  const drills = (payload.drills || []).map((item) => `<li>${escapeHtml(item)}</li>`).join("");
-  const previewPath = payload.action_preview
-    ? payload.action_preview.target_path
-    : payload.node
-      ? payload.node.note_path || ""
-      : payload.pack
-        ? payload.pack.anchor.note_path || ""
-        : "";
-  const preview = `<small>${payload.action_preview ? "dry-run: " : ""}${escapeHtml(previewPath)}</small>`;
   const title = payload.error ? payload.error.title : (payload.title || (payload.pack ? payload.pack.anchor.title : ""));
   const summary = payload.error
     ? payload.error.summary
@@ -360,35 +359,94 @@ function renderSmartResult(payload) {
   const secondary = payload.error
     ? payload.error.root_cause
     : (payload.overview || (payload.pack ? payload.pack.anchor.summary : ""));
-  const listHtml = [weaknesses, generatedNodes, teachingSections, relations, drills].filter((item) => item).join("")
-    || "<li>-</li>";
-  const markdown = payload.markdown ? `<pre class="console-output">${escapeHtml(payload.markdown)}</pre>` : "";
-  const reviewMeta = payload.review_id
-    ? `<small>review #${escapeHtml(payload.review_id)}: ${escapeHtml(payload.proposal_path || "")}</small>`
+  const previewPath = payload.action_preview
+    ? payload.action_preview.target_path
+    : payload.node
+      ? payload.node.note_path || ""
+      : payload.pack
+        ? payload.pack.anchor.note_path || ""
+        : "";
+
+  const metaItems = [];
+  if (previewPath) metaItems.push(`path: ${escapeHtml(previewPath)}`);
+  if (payload.stored_edges) metaItems.push(`stored edges: ${escapeHtml(payload.stored_edges)}`);
+  if (payload.pack?.recommended_output_shape) metaItems.push(`shape: ${escapeHtml(payload.pack.recommended_output_shape)}`);
+  if (payload.pack?.token_budget_hint) metaItems.push(`budget: ${escapeHtml(payload.pack.token_budget_hint)}`);
+  if (payload.delivery_mode) metaItems.push(`delivery: ${escapeHtml(payload.delivery_mode)}`);
+  if (payload.review_id) metaItems.push(`review #${escapeHtml(payload.review_id)}`);
+
+  const listSections = [];
+  if ((payload.weaknesses || []).length) {
+    listSections.push(`
+      <section class="result-block">
+        <h3>Weaknesses</h3>
+        <ul>${payload.weaknesses.map((item) => `<li>${escapeHtml(item.name)}: ${escapeHtml(item.summary)}</li>`).join("")}</ul>
+      </section>
+    `);
+  }
+  if ((payload.related_nodes || []).length) {
+    listSections.push(`
+      <section class="result-block">
+        <h3>Related Nodes</h3>
+        <ul>${payload.related_nodes.map((item) => `<li>${escapeHtml(item.node_type)}: ${escapeHtml(item.title)}</li>`).join("")}</ul>
+      </section>
+    `);
+  }
+  if ((((payload.pack || {}).edges) || []).length) {
+    listSections.push(`
+      <section class="result-block">
+        <h3>Relations</h3>
+        <ul>${payload.pack.edges.map((item) => `<li>${escapeHtml(item.relation_type)} -> ${escapeHtml(item.to_node_key)} (${escapeHtml(item.confidence)})</li>`).join("")}</ul>
+      </section>
+    `);
+  }
+  if ((payload.sections || []).length) {
+    listSections.push(`
+      <section class="result-block">
+        <h3>Teaching Sections</h3>
+        <ul>${payload.sections.map((item) => `<li><strong>${escapeHtml(item.heading)}</strong>: ${escapeHtml(item.body)}</li>`).join("")}</ul>
+      </section>
+    `);
+  }
+  if ((payload.drills || []).length) {
+    listSections.push(`
+      <section class="result-block">
+        <h3>Practice Drills</h3>
+        <ul>${payload.drills.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+      </section>
+    `);
+  }
+
+  const markdown = payload.markdown
+    ? `
+      <details class="result-details">
+        <summary>Markdown Preview</summary>
+        <pre class="result-markdown">${escapeHtml(payload.markdown)}</pre>
+      </details>
+    `
     : "";
-  const edgeMeta = payload.stored_edges ? `<small>stored edges: ${escapeHtml(payload.stored_edges)}</small>` : "";
-  const packMeta = payload.pack
-    ? `<small>shape: ${escapeHtml(payload.pack.recommended_output_shape || "-")} - budget: ${escapeHtml(payload.pack.token_budget_hint || "-")}</small>`
+  const telemetry = payload.telemetry && Object.keys(payload.telemetry).length
+    ? `
+      <details class="result-details">
+        <summary>Telemetry</summary>
+        <pre class="result-json">${escapeHtml(JSON.stringify(payload.telemetry, null, 2))}</pre>
+      </details>
+    `
     : "";
-  const deliveryMeta = payload.delivery_mode
-    ? `<small>delivery: ${escapeHtml(payload.delivery_mode)}</small>`
-    : "";
-  const telemetryMeta = payload.telemetry && Object.keys(payload.telemetry).length
-    ? `<small>telemetry: ${escapeHtml(JSON.stringify(payload.telemetry))}</small>`
-    : "";
+
   target.innerHTML = `
-    <article class="result-card">
-      <strong>${escapeHtml(title)}</strong>
-      <div>${escapeHtml(summary)}</div>
-      <div>${escapeHtml(secondary)}</div>
-      <ul>${listHtml}</ul>
-      ${preview}
-      ${edgeMeta}
-      ${packMeta}
-      ${deliveryMeta}
-      ${telemetryMeta}
-      ${reviewMeta}
+    <article class="result-card result-card-smart">
+      <div class="result-header">
+        <strong>${escapeHtml(title || "Smart Result")}</strong>
+        <div class="result-meta">${metaItems.map((item) => `<span>${item}</span>`).join("")}</div>
+      </div>
+      <div class="result-summary">${escapeHtml(summary)}</div>
+      <div class="result-secondary">${escapeHtml(secondary)}</div>
+      <div class="result-grid">
+        ${listSections.join("") || `<section class="result-block"><h3>Info</h3><div class="result-empty">No structured items returned.</div></section>`}
+      </div>
       ${markdown}
+      ${telemetry}
     </article>
   `;
 }
@@ -398,7 +456,7 @@ async function loadRuntime() {
   document.getElementById("healthBadge").textContent = runtime.health;
   document.getElementById("envPath").textContent = runtime.env_path;
   setFormValues(runtime.settings);
-  logResult(t("runtimeLoaded"), runtime);
+  return runtime;
 }
 
 async function loadReviews() {
@@ -408,7 +466,7 @@ async function loadReviews() {
     <div>${escapeHtml(item.source_note_path || "")}</div>
     <small>${escapeHtml(item.target_note_path || t("noTargetNote"))} - ${escapeHtml(item.risk_level)}</small>
   `);
-  logResult(t("reviewQueueRefreshed"), payload);
+  return payload;
 }
 
 async function runMaintenance(target) {
@@ -418,7 +476,7 @@ async function runMaintenance(target) {
     <div>${escapeHtml(item.reason)}</div>
     <small>${escapeHtml(t("scoreLabel"))}: ${escapeHtml(item.score)}</small>
   `);
-  logResult(`${t("maintenancePrefix")} ${target}`, payload);
+  return payload;
 }
 
 document.getElementById("saveAdminToken").addEventListener("click", () => {
@@ -431,52 +489,50 @@ document.getElementById("saveAdminToken").addEventListener("click", () => {
 });
 
 document.getElementById("saveConfig").addEventListener("click", async () => {
-  const payload = await api("/ui/api/config", {
+  const payload = await runUiAction(t("configSaved"), () => api("/ui/api/config", {
     method: "PUT",
     body: JSON.stringify(getFormValues()),
-  });
-  logResult(t("configSaved"), payload);
-  setFormValues(payload.settings);
+  }));
+  if (payload) {
+    setFormValues(payload.settings);
+  }
 });
 
 document.getElementById("reloadRuntime").addEventListener("click", async () => {
-  const payload = await api("/ui/api/reload", { method: "POST" });
-  logResult(t("runtimeReloaded"), payload);
-  setFormValues(payload.settings);
+  const payload = await runUiAction(t("runtimeReloaded"), () => api("/ui/api/reload", { method: "POST" }));
+  if (payload) {
+    setFormValues(payload.settings);
+  }
 });
 
 document.getElementById("seedDemo").addEventListener("click", async () => {
-  const payload = await api("/ui/api/seed-demo", { method: "POST" });
-  logResult(t("demoVaultSeeded"), payload);
+  await runUiAction(t("demoVaultSeeded"), () => api("/ui/api/seed-demo", { method: "POST" }));
 });
 
 document.getElementById("reindex").addEventListener("click", async () => {
-  const payload = await api("/ui/api/reindex", { method: "POST" });
-  logResult(t("vaultReindexed"), payload);
+  await runUiAction(t("vaultReindexed"), () => api("/ui/api/reindex", { method: "POST" }));
 });
 
 document.getElementById("runDigest").addEventListener("click", async () => {
-  const payload = await api("/ui/api/weekly-digest", {
+  await runUiAction(t("weeklyDigestDone"), () => api("/ui/api/weekly-digest", {
     method: "POST",
     body: JSON.stringify({ week_key: document.getElementById("weekKey").value }),
-  });
-  logResult(t("weeklyDigestDone"), payload);
+  }));
 });
 
 document.getElementById("captureSubmit").addEventListener("click", async () => {
-  const payload = await api("/capture/text", {
+  await runUiAction(t("captureComplete"), () => api("/capture/text", {
     method: "POST",
     body: JSON.stringify({
       title: document.getElementById("captureTitle").value,
       text: document.getElementById("captureText").value,
       source_ref: "ui",
     }),
-  });
-  logResult(t("captureComplete"), payload);
+  }));
 });
 
 document.getElementById("smartCaptureSubmit").addEventListener("click", async () => {
-  const payload = await api("/smart/error-capture", {
+  const payload = await runUiAction(t("smartCaptureComplete"), () => api("/smart/error-capture", {
     method: "POST",
     body: JSON.stringify({
       title: document.getElementById("smartTitle").value,
@@ -486,39 +542,42 @@ document.getElementById("smartCaptureSubmit").addEventListener("click", async ()
       language: "c",
       source_ref: "ui-smart",
     }),
-  });
-  document.getElementById("nodePackKey").value = payload.node.node_key;
-  renderSmartResult(payload);
-  logResult(t("smartCaptureComplete"), payload);
+  }));
+  if (payload) {
+    document.getElementById("nodePackKey").value = payload.node.node_key;
+    renderSmartResult(payload);
+  }
 });
 
 document.getElementById("nodePackSubmit").addEventListener("click", async () => {
-  const payload = await api("/smart/node-pack", {
+  const payload = await runUiAction(t("nodePackComplete"), () => api("/smart/node-pack", {
     method: "POST",
     body: JSON.stringify({
       node_key: document.getElementById("nodePackKey").value,
       top_k: 5,
     }),
-  });
-  renderSmartResult(payload);
-  logResult(t("nodePackComplete"), payload);
+  }));
+  if (payload) {
+    renderSmartResult(payload);
+  }
 });
 
 document.getElementById("teachSubmit").addEventListener("click", async () => {
-  const payload = await api("/smart/teach", {
+  const payload = await runUiAction(t("teachPackComplete"), () => api("/smart/teach", {
     method: "POST",
     body: JSON.stringify({
       node_key: document.getElementById("nodePackKey").value,
       top_k: 5,
       delivery_mode: document.getElementById("teachMode").value,
     }),
-  });
-  renderSmartResult(payload);
-  logResult(t("teachPackComplete"), payload);
+  }));
+  if (payload) {
+    renderSmartResult(payload);
+  }
 });
 
 document.getElementById("relinkSubmit").addEventListener("click", async () => {
-  const payload = await api("/smart/relink", {
+  const payload = await runUiAction(t("relinkComplete"), () => api("/smart/relink", {
     method: "POST",
     body: JSON.stringify({
       node_key: document.getElementById("nodePackKey").value,
@@ -526,30 +585,49 @@ document.getElementById("relinkSubmit").addEventListener("click", async () => {
       create_review: true,
       dry_run: false,
     }),
-  });
-  renderSmartResult(payload);
-  logResult(t("relinkComplete"), payload);
+  }));
+  if (payload) {
+    renderSmartResult(payload);
+  }
 });
 
 document.getElementById("searchSubmit").addEventListener("click", async () => {
   const query = document.getElementById("searchQuery").value;
-  const payload = await api(`/search?q=${encodeURIComponent(query)}`);
-  renderCards(document.getElementById("searchResults"), payload.results, (item) => `
-    <strong>${escapeHtml(item.path)}</strong>
-    <div>${escapeHtml(item.reason)}</div>
-    <small>${escapeHtml(t("scoreLabel"))}: ${escapeHtml(item.score)}</small>
-  `);
-  logResult(t("searchComplete"), payload);
+  const payload = await runUiAction(t("searchComplete"), () => api(`/search?q=${encodeURIComponent(query)}`));
+  if (payload) {
+    renderCards(document.getElementById("searchResults"), payload.results, (item) => `
+      <strong>${escapeHtml(item.path)}</strong>
+      <div>${escapeHtml(item.reason)}</div>
+      <small>${escapeHtml(t("scoreLabel"))}: ${escapeHtml(item.score)}</small>
+    `);
+  }
 });
 
-document.getElementById("refreshReviews").addEventListener("click", loadReviews);
+document.getElementById("refreshReviews").addEventListener("click", async () => {
+  await runUiAction(t("reviewQueueRefreshed"), loadReviews);
+});
+
 document.getElementById("refreshMaintenance").addEventListener("click", async () => {
-  await runMaintenance("duplicates");
+  const payload = await runUiAction(`${t("maintenancePrefix")} duplicates`, () => runMaintenance("duplicates"));
+  if (payload) {
+    renderCards(document.getElementById("maintenanceResults"), payload.items, (item) => `
+      <strong>${escapeHtml(item.path)}</strong>
+      <div>${escapeHtml(item.reason)}</div>
+      <small>${escapeHtml(t("scoreLabel"))}: ${escapeHtml(item.score)}</small>
+    `);
+  }
 });
 
 for (const button of document.querySelectorAll(".maintenance-trigger")) {
   button.addEventListener("click", async () => {
-    await runMaintenance(button.dataset.target);
+    const payload = await runUiAction(`${t("maintenancePrefix")} ${button.dataset.target}`, () => runMaintenance(button.dataset.target));
+    if (payload) {
+      renderCards(document.getElementById("maintenanceResults"), payload.items, (item) => `
+        <strong>${escapeHtml(item.path)}</strong>
+        <div>${escapeHtml(item.reason)}</div>
+        <small>${escapeHtml(t("scoreLabel"))}: ${escapeHtml(item.score)}</small>
+      `);
+    }
   });
 }
 
@@ -564,6 +642,5 @@ languageSelect.addEventListener("change", () => {
 applyLanguage(currentLanguage());
 adminTokenInput.value = adminToken();
 
-loadRuntime()
-  .then(loadReviews)
-  .catch((error) => logResult(t("startupError"), error.message));
+runUiAction(t("runtimeLoaded"), loadRuntime)
+  .then(() => runUiAction(t("reviewQueueRefreshed"), loadReviews));
